@@ -1,30 +1,31 @@
 ===========================================
 Bedrock Text2SQL Agent - Deployment Info
 ===========================================
-Deployment Date: Thu Nov  6 16:11:43 GMT 2025
+Deployment Date: Thu Nov  6 17:33:44 GMT 2025
 AWS Region: eu-central-1
 AWS Account: 194561596031
-Alias: txt2sql-gdpr
+Environment: prod
+Alias: txt2sql-prod
 
 Stack Names:
-  - Stack 1: athena-glue-s3-stack
-  - Stack 2: bedrock-agent-lambda-stack
-  - Stack 3: ec2-streamlit-stack
+  - Stack 1: prod-eu-central-1-athena-glue-s3-stack
+  - Stack 2: prod-eu-central-1-bedrock-agent-lambda-stack
+  - Stack 3: prod-eu-central-1-ec2-streamlit-stack
 
 Resources:
-  - S3 Data Bucket: sl-data-store-txt2sql-gdpr-194561596031-eu-central-1
-  - Athena Output Bucket: sl-athena-output-txt2sql-gdpr-194561596031-eu-central-1
+  - S3 Data Bucket: sl-data-store-txt2sql-prod-194561596031-eu-central-1
+  - Athena Output Bucket: sl-athena-output-txt2sql-prod-194561596031-eu-central-1
   - Athena Database: athena_db
-  - Bedrock Agent ID: XQW5D4II39
-  - Agent Alias ID: TSTALIASID
-  - EC2 Instance ID: i-0d18119b1c8046d6f
+  - Bedrock Agent ID: OH7BUQUMD0
+  - Agent Alias ID: F8WTYMBIRT
+  - EC2 Instance ID: i-0412aecc64b732f34
   - Public DNS: 
 
 Streamlit App URL: http://:8501
 
 EC2 Connect Command:
-  aws ec2-instance-connect ssh --instance-id i-0d18119b1c8046d6f --region eu-central-1
+  aws ec2-instance-connect ssh --instance-id i-0412aecc64b732f34 --region eu-central-1
 
 Cleanup Command:
-  ./cleanup.sh
+  ENVIRONMENT=prod AWS_REGION=eu-central-1 ALIAS=txt2sql ./cleanup.sh
 ===========================================

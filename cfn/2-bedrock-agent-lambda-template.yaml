@@ -76,7 +76,7 @@ Resources:
   AthenaQueryLambdaDLQ:
     Type: 'AWS::SQS::Queue'
     Properties:
-      QueueName: !Sub "AthenaQueryLambdaDLQ-${AWS::AccountId}-${AWS::Region}"
+      QueueName: !Sub "AthenaQueryLambdaDLQ-${Alias}-${AWS::AccountId}-${AWS::Region}"
 
   AthenaQueryLambda:
     Type: 'AWS::Lambda::Function'
@@ -349,7 +349,7 @@ Resources:
 
               <athena_schemas>
                 <athena_schema> 
-                CREATE EXTERNAL TABLE athena_db.customers ( 
+                CREATE EXTERNAL TABLE ${Alias}_${AthenaDatabaseName}.customers ( 
                 `Cust_Id` integer, 
                 `Customer` string, 
                 `Balance` integer, 
@@ -358,11 +358,11 @@ Resources:
                 ROW FORMAT DELIMITED 
                 FIELDS TERMINATED BY ',' 
                 LINES TERMINATED BY '\n' 
-                STORED AS TEXTFILE LOCATION 's3://sl-athena-output-${Alias}-${AWS::AccountId}-${AWS::Region}/'; 
+                STORED AS TEXTFILE LOCATION 's3://sl-data-store-${Alias}-${AWS::AccountId}-${AWS::Region}/customers/'; 
                 </athena_schema>
 
                 <athena_schema> 
-                CREATE EXTERNAL TABLE athena_db.procedures ( 
+                CREATE EXTERNAL TABLE ${Alias}_${AthenaDatabaseName}.procedures ( 
                 `Procedure_ID` string, 
                 `Procedure` string, 
                 `Category` string, 
@@ -373,7 +373,7 @@ Resources:
                 ROW FORMAT DELIMITED 
                 FIELDS TERMINATED BY ',' 
                 LINES TERMINATED BY '\n' 
-                STORED AS TEXTFILE LOCATION 's3://sl-athena-output-${Alias}-${AWS::AccountId}-${AWS::Region}/'; 
+                STORED AS TEXTFILE LOCATION 's3://sl-data-store-${Alias}-${AWS::AccountId}-${AWS::Region}/procedures/'; 
                 </athena_schema>
               </athena_schemas>
 
@@ -381,11 +381,11 @@ Resources:
 
               <athena_examples>
                 <athena_example> 
-                SELECT * FROM athena_db.procedures WHERE insurance = 'yes' OR insurance_covered = 'no'; 
+                SELECT * FROM ${Alias}_${AthenaDatabaseName}.procedures WHERE insurance = 'yes' OR insurance = 'no'; 
                 </athena_example>
 
                 <athena_example> 
-                SELECT * FROM athena_db.customers WHERE balance >= 0; 
+                SELECT * FROM ${Alias}_${AthenaDatabaseName}.customers WHERE balance >= 0; 
                 </athena_example>
               </athena_examples>
 
