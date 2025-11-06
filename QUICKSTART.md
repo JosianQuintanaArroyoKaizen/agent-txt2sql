@@ -31,7 +31,8 @@ cd /home/jquintana-arroyo/git/agent-txt2sql
 
 # Set your configuration (optional)
 export AWS_REGION=us-west-2        # Your preferred region
-export ALIAS=my-txt2sql            # Your resource naming prefix
+export ENVIRONMENT=dev             # Deployment environment (e.g., dev, prod)
+export ALIAS=my-txt2sql            # Base alias for resource naming
 
 # Deploy everything with one command
 ./deploy.sh
@@ -112,7 +113,7 @@ User Input → Streamlit UI → Bedrock Agent → Lambda → Athena → S3 Data
 
 ### Cleanup (Delete everything)
 ```bash
-./cleanup.sh
+ENVIRONMENT=$ENVIRONMENT AWS_REGION=$AWS_REGION ALIAS=$ALIAS ./cleanup.sh
 ```
 
 ### Check deployment status

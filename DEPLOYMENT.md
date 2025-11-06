@@ -19,8 +19,9 @@ This guide provides instructions for deploying the Amazon Bedrock Text2SQL Agent
 chmod +x deploy.sh cleanup.sh
 
 # Set environment variables (optional)
-export AWS_REGION=us-west-2  # Default region
-export ALIAS=txt2sql-demo    # Default alias for resource naming
+export AWS_REGION=us-west-2   # Target AWS region
+export ENVIRONMENT=dev        # Deployment environment (dev, prod, etc.)
+export ALIAS=txt2sql         # Base alias used in resource names
 
 # Deploy all stacks
 ./deploy.sh
@@ -68,7 +69,7 @@ aws cloudformation deploy \
     --template-file cfn/1-athena-glue-s3-template.yaml \
     --stack-name athena-glue-s3-stack \
     --parameter-overrides \
-        Alias="txt2sql-demo" \
+        Alias="txt2sql-dev" \
         AthenaDatabaseName="athena_db" \
     --capabilities CAPABILITY_IAM \
     --region us-west-2
@@ -81,7 +82,7 @@ aws cloudformation deploy \
     --template-file cfn/2-bedrock-agent-lambda-template.yaml \
     --stack-name bedrock-agent-lambda-stack \
     --parameter-overrides \
-        Alias="txt2sql-demo" \
+        Alias="txt2sql-dev" \
         FoundationModel="anthropic.claude-3-haiku-20240307-v1:0" \
     --capabilities CAPABILITY_IAM \
     --region us-west-2
@@ -150,7 +151,7 @@ aws cloudformation deploy \
 To delete all resources and avoid charges:
 
 ```bash
-./cleanup.sh
+ENVIRONMENT=dev AWS_REGION=us-west-2 ALIAS=txt2sql ./cleanup.sh
 ```
 
 This will:

@@ -1,0 +1,30 @@
+===========================================
+Bedrock Text2SQL Agent - Deployment Info
+===========================================
+Deployment Date: Thu Nov  6 16:11:43 GMT 2025
+AWS Region: eu-central-1
+AWS Account: 194561596031
+Alias: txt2sql-gdpr
+
+Stack Names:
+  - Stack 1: athena-glue-s3-stack
+  - Stack 2: bedrock-agent-lambda-stack
+  - Stack 3: ec2-streamlit-stack
+
+Resources:
+  - S3 Data Bucket: sl-data-store-txt2sql-gdpr-194561596031-eu-central-1
+  - Athena Output Bucket: sl-athena-output-txt2sql-gdpr-194561596031-eu-central-1
+  - Athena Database: athena_db
+  - Bedrock Agent ID: XQW5D4II39
+  - Agent Alias ID: TSTALIASID
+  - EC2 Instance ID: i-0d18119b1c8046d6f
+  - Public DNS: 
+
+Streamlit App URL: http://:8501
+
+EC2 Connect Command:
+  aws ec2-instance-connect ssh --instance-id i-0d18119b1c8046d6f --region eu-central-1
+
+Cleanup Command:
+  ./cleanup.sh
+===========================================

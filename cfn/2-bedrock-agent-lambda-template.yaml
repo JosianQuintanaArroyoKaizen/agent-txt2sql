@@ -71,7 +71,7 @@ Resources:
           - Effect: Allow
             Action:
               - 'lambda:InvokeFunction'
-            Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:AthenaQueryLambda-${AWS::AccountId}'
+            Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:AthenaQueryLambda-${Alias}-${AWS::Region}-${AWS::AccountId}'
 
   AthenaQueryLambdaDLQ:
     Type: 'AWS::SQS::Queue'
@@ -81,7 +81,7 @@ Resources:
   AthenaQueryLambda:
     Type: 'AWS::Lambda::Function'
     Properties:
-      FunctionName: !Sub 'AthenaQueryLambda-${AWS::AccountId}'
+      FunctionName: !Sub 'AthenaQueryLambda-${Alias}-${AWS::Region}-${AWS::AccountId}'
       Handler: index.lambda_handler
       Role: !GetAtt AthenaQueryLambdaExecutionRole.Arn
       Runtime: python3.12
@@ -213,7 +213,7 @@ Resources:
     Type: "AWS::Bedrock::Agent"
     DependsOn: LambdaInvokePermission
     Properties:
-      AgentName: !Sub 'AthenaAgent-${AWS::AccountId}'
+      AgentName: !Sub 'AthenaAgent-${Alias}-${AWS::Region}-${AWS::AccountId}'
       AgentResourceRoleArn: !GetAtt BedrockAgentExecutionRole.Arn
       AutoPrepare: 'True'
       FoundationModel: !Ref FoundationModel
@@ -241,7 +241,7 @@ Resources:
         - ActionGroupName: "query-athena"
           Description: "This action group is used to query information about customers and procedures"
           ActionGroupExecutor:
-            Lambda: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:AthenaQueryLambda-${AWS::AccountId}'
+            Lambda: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:AthenaQueryLambda-${Alias}-${AWS::Region}-${AWS::AccountId}'
           ApiSchema:
             Payload: |
               {
@@ -358,7 +358,7 @@ Resources:
                 ROW FORMAT DELIMITED 
                 FIELDS TERMINATED BY ',' 
                 LINES TERMINATED BY '\n' 
-                STORED AS TEXTFILE LOCATION 's3://sl-athena-output-alias/'; 
+                STORED AS TEXTFILE LOCATION 's3://sl-athena-output-${Alias}-${AWS::AccountId}-${AWS::Region}/'; 
                 </athena_schema>
 
                 <athena_schema> 
@@ -373,7 +373,7 @@ Resources:
                 ROW FORMAT DELIMITED 
                 FIELDS TERMINATED BY ',' 
                 LINES TERMINATED BY '\n' 
-                STORED AS TEXTFILE LOCATION 's3://sl-athena-output-alias/'; 
+                STORED AS TEXTFILE LOCATION 's3://sl-athena-output-${Alias}-${AWS::AccountId}-${AWS::Region}/'; 
                 </athena_schema>
               </athena_schemas>
 
@@ -434,7 +434,7 @@ Resources:
     Type: 'AWS::Bedrock::AgentAlias'
     DependsOn: BedrockAgent
     Properties:
-      AgentAliasName: !Sub 'Alias-1'
+      AgentAliasName: !Sub '${Alias}-${AWS::Region}-alias'
       AgentId: !GetAtt BedrockAgent.AgentId
       
 Outputs:

@@ -16,10 +16,14 @@ NC='\033[0m' # No Color
 
 # Configuration
 REGION="${AWS_REGION:-us-west-2}"
-ALIAS="${ALIAS:-txt2sql-demo}"
-STACK_NAME_1="athena-glue-s3-stack"
-STACK_NAME_2="bedrock-agent-lambda-stack"
-STACK_NAME_3="ec2-streamlit-stack"
+ENVIRONMENT="${ENVIRONMENT:-dev}"
+ENVIRONMENT="$(echo "${ENVIRONMENT}" | tr '[:upper:]' '[:lower:]')"
+ALIAS_BASE="${ALIAS:-txt2sql}"
+ALIAS_FULL="${ALIAS_BASE}-${ENVIRONMENT}"
+STACK_SUFFIX="${ENVIRONMENT}-${REGION}"
+STACK_NAME_1="${STACK_SUFFIX}-athena-glue-s3-stack"
+STACK_NAME_2="${STACK_SUFFIX}-bedrock-agent-lambda-stack"
+STACK_NAME_3="${STACK_SUFFIX}-ec2-streamlit-stack"
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  Bedrock Text2SQL Agent Deployment${NC}"
@@ -42,31 +46,38 @@ fi
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 echo -e "${GREEN}✓ AWS Account: ${ACCOUNT_ID}${NC}"
 echo -e "${GREEN}✓ Region: ${REGION}${NC}"
-echo -e "${GREEN}✓ Alias: ${ALIAS}${NC}"
+echo -e "${GREEN}✓ Environment: ${ENVIRONMENT}${NC}"
+echo -e "${GREEN}✓ Alias: ${ALIAS_FULL}${NC}"
 echo ""
 
 # Function to wait for stack completion
 wait_for_stack() {
     local stack_name=$1
     echo -e "${YELLOW}Waiting for stack ${stack_name} to complete...${NC}"
-    
-    # Check if stack exists and determine operation
-    if aws cloudformation describe-stacks --stack-name "${stack_name}" --region "${REGION}" &>/dev/null; then
-        # Stack exists, wait for update
-        aws cloudformation wait stack-update-complete \
-            --stack-name "${stack_name}" \
-            --region "${REGION}" 2>/dev/null || true
-    else
-        # New stack, wait for create
-        aws cloudformation wait stack-create-complete \
-            --stack-name "${stack_name}" \
-            --region "${REGION}" || {
-            echo -e "${RED}Stack creation failed. Check CloudFormation console for details.${NC}"
-            exit 1
-        }
+
+    if aws cloudformation wait stack-create-complete \
+        --stack-name "${stack_name}" \
+        --region "${REGION}" 2>/dev/null; then
+        echo -e "${GREEN}✓ Stack ${stack_name} completed successfully${NC}"
+        return
     fi
-    
-    echo -e "${GREEN}✓ Stack ${stack_name} completed successfully${NC}"
+
+    if aws cloudformation wait stack-update-complete \
+        --stack-name "${stack_name}" \
+        --region "${REGION}" 2>/dev/null; then
+        echo -e "${GREEN}✓ Stack ${stack_name} completed successfully${NC}"
+        return
+    fi
+
+    local status
+    status=$(aws cloudformation describe-stacks \
+        --stack-name "${stack_name}" \
+        --region "${REGION}" \
+        --query 'Stacks[0].StackStatus' \
+        --output text 2>/dev/null || echo "UNKNOWN")
+
+    echo -e "${RED}Stack ${stack_name} failed or is in unexpected status: ${status}${NC}"
+    exit 1
 }
 
 # Deploy Stack 1: Athena, Glue, and S3
@@ -75,7 +86,7 @@ aws cloudformation deploy \
     --template-file cfn/1-athena-glue-s3-template.yaml \
     --stack-name "${STACK_NAME_1}" \
     --parameter-overrides \
-        Alias="${ALIAS}" \
+        Alias="${ALIAS_FULL}" \
         AthenaDatabaseName="athena_db" \
     --capabilities CAPABILITY_IAM \
     --region "${REGION}"
@@ -114,7 +125,7 @@ aws cloudformation deploy \
     --template-file cfn/2-bedrock-agent-lambda-template.yaml \
     --stack-name "${STACK_NAME_2}" \
     --parameter-overrides \
-        Alias="${ALIAS}" \
+        Alias="${ALIAS_FULL}" \
         FoundationModel="${MODEL_ID}" \
     --capabilities CAPABILITY_IAM \
     --region "${REGION}"
@@ -228,7 +239,8 @@ Bedrock Text2SQL Agent - Deployment Info
 Deployment Date: $(date)
 AWS Region: ${REGION}
 AWS Account: ${ACCOUNT_ID}
-Alias: ${ALIAS}
+Environment: ${ENVIRONMENT}
+Alias: ${ALIAS_FULL}
 
 Stack Names:
   - Stack 1: ${STACK_NAME_1}
@@ -250,11 +262,11 @@ EC2 Connect Command:
   aws ec2-instance-connect ssh --instance-id ${INSTANCE_ID} --region ${REGION}
 
 Cleanup Command:
-  ./cleanup.sh
+  ENVIRONMENT=${ENVIRONMENT} AWS_REGION=${REGION} ALIAS=${ALIAS_BASE} ./cleanup.sh
 ===========================================
 EOF
 
 echo ""
-echo -e "${BLUE}For cleanup, run: ${GREEN}./cleanup.sh${NC}"
+echo -e "${BLUE}For cleanup, run: ${GREEN}ENVIRONMENT=${ENVIRONMENT} AWS_REGION=${REGION} ALIAS=${ALIAS_BASE} ./cleanup.sh${NC}"
 echo ""
 

@@ -14,7 +14,8 @@ on:
 
 env:
   AWS_REGION: us-west-2
-  ALIAS: txt2sql-demo
+  ALIAS: txt2sql
+  ENVIRONMENT: dev
 
 jobs:
   validate:
@@ -66,11 +67,12 @@ jobs:
 
       - name: Deploy Stack 1 - Athena, Glue, S3
         run: |
+          STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
           aws cloudformation deploy \
             --template-file cfn/1-athena-glue-s3-template.yaml \
-            --stack-name athena-glue-s3-stack-dev \
+            --stack-name "${STACK_SUFFIX}-athena-glue-s3-stack" \
             --parameter-overrides \
-              Alias="${{ env.ALIAS }}-dev" \
+              Alias="${{ env.ALIAS }}-${{ env.ENVIRONMENT }}" \
               AthenaDatabaseName="athena_db" \
             --capabilities CAPABILITY_IAM \
             --region ${{ env.AWS_REGION }} \
@@ -78,20 +80,22 @@ jobs:
 
       - name: Wait for Stack 1
         run: |
+          STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
           aws cloudformation wait stack-create-complete \
-            --stack-name athena-glue-s3-stack-dev \
+            --stack-name "${STACK_SUFFIX}-athena-glue-s3-stack" \
             --region ${{ env.AWS_REGION }} || \
           aws cloudformation wait stack-update-complete \
-            --stack-name athena-glue-s3-stack-dev \
+            --stack-name "${STACK_SUFFIX}-athena-glue-s3-stack" \
             --region ${{ env.AWS_REGION }} || true
 
       - name: Deploy Stack 2 - Bedrock Agent and Lambda
         run: |
+          STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
           aws cloudformation deploy \
             --template-file cfn/2-bedrock-agent-lambda-template.yaml \
-            --stack-name bedrock-agent-lambda-stack-dev \
+            --stack-name "${STACK_SUFFIX}-bedrock-agent-lambda-stack" \
             --parameter-overrides \
-              Alias="${{ env.ALIAS }}-dev" \
+              Alias="${{ env.ALIAS }}-${{ env.ENVIRONMENT }}" \
               FoundationModel="anthropic.claude-3-haiku-20240307-v1:0" \
             --capabilities CAPABILITY_IAM \
             --region ${{ env.AWS_REGION }} \
@@ -99,18 +103,20 @@ jobs:
 
       - name: Wait for Stack 2
         run: |
+          STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
           aws cloudformation wait stack-create-complete \
-            --stack-name bedrock-agent-lambda-stack-dev \
+            --stack-name "${STACK_SUFFIX}-bedrock-agent-lambda-stack" \
             --region ${{ env.AWS_REGION }} || \
           aws cloudformation wait stack-update-complete \
-            --stack-name bedrock-agent-lambda-stack-dev \
+            --stack-name "${STACK_SUFFIX}-bedrock-agent-lambda-stack" \
             --region ${{ env.AWS_REGION }} || true
 
       - name: Get Agent IDs
         id: agent
         run: |
+          STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
           AGENT_ID=$(aws cloudformation describe-stacks \
-            --stack-name bedrock-agent-lambda-stack-dev \
+            --stack-name "${STACK_SUFFIX}-bedrock-agent-lambda-stack" \
             --region ${{ env.AWS_REGION }} \
             --query 'Stacks[0].Outputs[?OutputKey==`BedrockAgentName`].OutputValue' \
             --output text)
@@ -126,12 +132,23 @@ jobs:
 
       - name: Deploy Stack 3 - EC2 Streamlit
         run: |
+          STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
+          case "${{ env.AWS_REGION }}" in
+            us-west-2) SSH_CIDR="18.237.140.160/29" ;;
+            us-east-1) SSH_CIDR="18.206.107.24/29" ;;
+            eu-central-1) SSH_CIDR="3.120.181.40/29" ;;
+            eu-west-1) SSH_CIDR="18.202.216.48/29" ;;
+            eu-west-2) SSH_CIDR="3.8.37.24/29" ;;
+            ap-southeast-1) SSH_CIDR="3.0.5.32/29" ;;
+            ap-northeast-1) SSH_CIDR="3.112.23.0/29" ;;
+            *) SSH_CIDR="18.237.140.160/29" ;;
+          esac
           aws cloudformation deploy \
             --template-file cfn/3-ec2-streamlit-template.yaml \
-            --stack-name ec2-streamlit-stack-dev \
+            --stack-name "${STACK_SUFFIX}-ec2-streamlit-stack" \
             --parameter-overrides \
               InstanceType="t3.small" \
-              SSHRegionIPsAllowed="18.237.140.160/29" \
+              SSHRegionIPsAllowed="${SSH_CIDR}" \
               MapPublicIpOnLaunch="true" \
             --capabilities CAPABILITY_IAM \
             --region ${{ env.AWS_REGION }} \
@@ -140,8 +157,9 @@ jobs:
       - name: Get Deployment Summary
         id: summary
         run: |
+          STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
           PUBLIC_DNS=$(aws cloudformation describe-stacks \
-            --stack-name ec2-streamlit-stack-dev \
+            --stack-name "${STACK_SUFFIX}-ec2-streamlit-stack" \
             --region ${{ env.AWS_REGION }} \
             --query 'Stacks[0].Outputs[?OutputKey==`PublicDnsName`].OutputValue' \
             --output text)

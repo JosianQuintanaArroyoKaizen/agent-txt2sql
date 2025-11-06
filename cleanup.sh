@@ -16,16 +16,20 @@ NC='\033[0m' # No Color
 
 # Configuration
 REGION="${AWS_REGION:-us-west-2}"
-ALIAS="${ALIAS:-txt2sql-demo}"
-STACK_NAME_1="athena-glue-s3-stack"
-STACK_NAME_2="bedrock-agent-lambda-stack"
-STACK_NAME_3="ec2-streamlit-stack"
+ENVIRONMENT="${ENVIRONMENT:-dev}"
+ENVIRONMENT="$(echo "${ENVIRONMENT}" | tr '[:upper:]' '[:lower:]')"
+ALIAS_BASE="${ALIAS:-txt2sql}"
+ALIAS_FULL="${ALIAS_BASE}-${ENVIRONMENT}"
+STACK_SUFFIX="${ENVIRONMENT}-${REGION}"
+STACK_NAME_1="${STACK_SUFFIX}-athena-glue-s3-stack"
+STACK_NAME_2="${STACK_SUFFIX}-bedrock-agent-lambda-stack"
+STACK_NAME_3="${STACK_SUFFIX}-ec2-streamlit-stack"
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  Bedrock Text2SQL Agent Cleanup${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
-echo -e "${YELLOW}WARNING: This will delete all resources created by the deployment.${NC}"
+echo -e "${YELLOW}WARNING: This will delete all resources created by the ${ENVIRONMENT} deployment.${NC}"
 echo -e "${YELLOW}This includes S3 buckets and their contents!${NC}"
 echo ""
 read -p "Are you sure you want to continue? (yes/no): " confirmation
@@ -102,9 +106,9 @@ echo ""
 echo -e "${BLUE}[3/3] Deleting Athena, Glue, and S3 Stack...${NC}"
 
 # Empty S3 buckets first
-empty_bucket "sl-data-store-${ALIAS}-${ACCOUNT_ID}-${REGION}"
-empty_bucket "sl-athena-output-${ALIAS}-${ACCOUNT_ID}-${REGION}"
-empty_bucket "sl-replication-${ALIAS}-${ACCOUNT_ID}-${REGION}"
+empty_bucket "sl-data-store-${ALIAS_FULL}-${ACCOUNT_ID}-${REGION}"
+empty_bucket "sl-athena-output-${ALIAS_FULL}-${ACCOUNT_ID}-${REGION}"
+empty_bucket "sl-replication-${ALIAS_FULL}-${ACCOUNT_ID}-${REGION}"
 empty_bucket "logging-bucket-${ACCOUNT_ID}-${REGION}"
 
 delete_stack "${STACK_NAME_1}"
