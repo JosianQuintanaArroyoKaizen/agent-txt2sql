@@ -1,0 +1,31 @@
+[0;34m========================================[0m
+[0;34m  Bedrock Text2SQL Agent Deployment[0m
+[0;34m========================================[0m
+
+[0;32m✓ AWS Account: 194561596031[0m
+[0;32m✓ Region: eu-central-1[0m
+[0;32m✓ Alias: txt2sql-gdpr[0m
+
+[0;34m[1/3] Deploying Athena, Glue, and S3 Stack...[0m
+
+Waiting for changeset to be created..
+
+No changes to deploy. Stack athena-glue-s3-stack is up to date
+[1;33mWaiting for stack athena-glue-s3-stack to create-or-update...[0m
+
+aws: [ERROR]: argument subcommand: Found invalid choice 'stack-create-or-update-complete'
+
+Maybe you meant:
+
+  * stack-refactor-create-complete
+  * stack-update-complete
+  * stack-create-complete
+
+usage: aws [options] <command> <subcommand> [<subcommand> ...] [parameters]
+To see help text, you can run:
+
+  aws help
+  aws <command> help
+  aws <command> <subcommand> help
+
+[0;31mStack create-or-update failed. Check CloudFormation console for details.[0m

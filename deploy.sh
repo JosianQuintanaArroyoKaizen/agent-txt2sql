@@ -48,15 +48,25 @@ echo ""
 # Function to wait for stack completion
 wait_for_stack() {
     local stack_name=$1
-    local operation=$2
-    echo -e "${YELLOW}Waiting for stack ${stack_name} to ${operation}...${NC}"
-    aws cloudformation wait stack-${operation}-complete \
-        --stack-name "${stack_name}" \
-        --region "${REGION}" || {
-        echo -e "${RED}Stack ${operation} failed. Check CloudFormation console for details.${NC}"
-        exit 1
-    }
-    echo -e "${GREEN}✓ Stack ${stack_name} ${operation}d successfully${NC}"
+    echo -e "${YELLOW}Waiting for stack ${stack_name} to complete...${NC}"
+    
+    # Check if stack exists and determine operation
+    if aws cloudformation describe-stacks --stack-name "${stack_name}" --region "${REGION}" &>/dev/null; then
+        # Stack exists, wait for update
+        aws cloudformation wait stack-update-complete \
+            --stack-name "${stack_name}" \
+            --region "${REGION}" 2>/dev/null || true
+    else
+        # New stack, wait for create
+        aws cloudformation wait stack-create-complete \
+            --stack-name "${stack_name}" \
+            --region "${REGION}" || {
+            echo -e "${RED}Stack creation failed. Check CloudFormation console for details.${NC}"
+            exit 1
+        }
+    fi
+    
+    echo -e "${GREEN}✓ Stack ${stack_name} completed successfully${NC}"
 }
 
 # Deploy Stack 1: Athena, Glue, and S3
@@ -70,7 +80,7 @@ aws cloudformation deploy \
     --capabilities CAPABILITY_IAM \
     --region "${REGION}"
 
-wait_for_stack "${STACK_NAME_1}" "create-or-update"
+wait_for_stack "${STACK_NAME_1}"
 
 # Get outputs from Stack 1
 S3_BUCKET=$(aws cloudformation describe-stacks \
@@ -109,7 +119,7 @@ aws cloudformation deploy \
     --capabilities CAPABILITY_IAM \
     --region "${REGION}"
 
-wait_for_stack "${STACK_NAME_2}" "create-or-update"
+wait_for_stack "${STACK_NAME_2}"
 
 # Get outputs from Stack 2
 AGENT_ID=$(aws cloudformation describe-stacks \
@@ -156,7 +166,7 @@ aws cloudformation deploy \
     --capabilities CAPABILITY_IAM \
     --region "${REGION}"
 
-wait_for_stack "${STACK_NAME_3}" "create-or-update"
+wait_for_stack "${STACK_NAME_3}"
 
 # Get EC2 instance details
 INSTANCE_ID=$(aws cloudformation describe-stacks \
