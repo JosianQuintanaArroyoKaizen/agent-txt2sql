@@ -20,6 +20,7 @@ ENVIRONMENT="${ENVIRONMENT:-dev}"
 ENVIRONMENT="$(echo "${ENVIRONMENT}" | tr '[:upper:]' '[:lower:]')"
 ALIAS_BASE="${ALIAS:-txt2sql}"
 ALIAS_FULL="${ALIAS_BASE}-${ENVIRONMENT}"
+ALIAS_DB="$(echo "${ALIAS_FULL}" | tr '-' '_')"
 STACK_SUFFIX="${ENVIRONMENT}-${REGION}"
 STACK_NAME_1="${STACK_SUFFIX}-athena-glue-s3-stack"
 STACK_NAME_2="${STACK_SUFFIX}-bedrock-agent-lambda-stack"
@@ -87,6 +88,7 @@ aws cloudformation deploy \
     --stack-name "${STACK_NAME_1}" \
     --parameter-overrides \
         Alias="${ALIAS_FULL}" \
+        AliasDb="${ALIAS_DB}" \
         AthenaDatabaseName="athena_db" \
     --capabilities CAPABILITY_IAM \
     --region "${REGION}"
@@ -127,6 +129,8 @@ aws cloudformation deploy \
     --parameter-overrides \
         Alias="${ALIAS_FULL}" \
         FoundationModel="${MODEL_ID}" \
+        AthenaDatabaseName="athena_db" \
+        AliasDb="${ALIAS_DB}" \
     --capabilities CAPABILITY_IAM \
     --region "${REGION}"
 
@@ -139,12 +143,39 @@ AGENT_ID=$(aws cloudformation describe-stacks \
     --query 'Stacks[0].Outputs[?OutputKey==`BedrockAgentName`].OutputValue' \
     --output text)
 
-# Get Agent Alias ID
-AGENT_ALIAS_ID=$(aws bedrock-agent list-agent-aliases \
-    --agent-id "${AGENT_ID}" \
-    --region "${REGION}" \
-    --query 'agentAliasSummaries[0].agentAliasId' \
-    --output text)
+# Get Agent Alias ID with retries and graceful handling of AccessDenied
+ALIAS_ATTEMPTS=0
+AGENT_ALIAS_ID=""
+while [ "${ALIAS_ATTEMPTS}" -lt 10 ]; do
+    ALIAS_ATTEMPTS=$((ALIAS_ATTEMPTS + 1))
+    set +e
+    ALIAS_OUTPUT=$(aws bedrock-agent list-agent-aliases \
+        --agent-id "${AGENT_ID}" \
+        --region "${REGION}" \
+        --query 'agentAliasSummaries[0].agentAliasId' \
+        --output text 2>&1)
+    ALIAS_STATUS=$?
+    set -e
+
+    if [ ${ALIAS_STATUS} -eq 0 ] && [ -n "${ALIAS_OUTPUT}" ] && [ "${ALIAS_OUTPUT}" != "None" ]; then
+        AGENT_ALIAS_ID="${ALIAS_OUTPUT}"
+        break
+    fi
+
+    if echo "${ALIAS_OUTPUT}" | grep -qi "AccessDenied"; then
+        echo -e "${YELLOW}⚠ Unable to list agent aliases with current AWS credentials. Please ensure the IAM user has bedrock:ListAgentAliases permission.${NC}"
+        AGENT_ALIAS_ID="ACCESS_DENIED"
+        break
+    fi
+
+    if [ ${ALIAS_ATTEMPTS} -lt 10 ]; then
+        echo -e "${YELLOW}Waiting for Bedrock agent alias to become available (attempt ${ALIAS_ATTEMPTS}/10)...${NC}"
+        sleep 6
+    else
+        echo -e "${YELLOW}⚠ Unable to retrieve agent alias after multiple attempts.${NC}"
+        AGENT_ALIAS_ID="UNKNOWN"
+    fi
+done
 
 echo -e "${GREEN}✓ Bedrock Agent ID: ${AGENT_ID}${NC}"
 echo -e "${GREEN}✓ Bedrock Agent Alias ID: ${AGENT_ALIAS_ID}${NC}"
@@ -241,6 +272,7 @@ AWS Region: ${REGION}
 AWS Account: ${ACCOUNT_ID}
 Environment: ${ENVIRONMENT}
 Alias: ${ALIAS_FULL}
+Alias DB: ${ALIAS_DB}
 
 Stack Names:
   - Stack 1: ${STACK_NAME_1}

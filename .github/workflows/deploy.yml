@@ -68,11 +68,14 @@ jobs:
       - name: Deploy Stack 1 - Athena, Glue, S3
         run: |
           STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
+          ALIAS_FULL="${{ env.ALIAS }}-${{ env.ENVIRONMENT }}"
+          ALIAS_DB=$(echo "${ALIAS_FULL}" | tr '-' '_')
           aws cloudformation deploy \
             --template-file cfn/1-athena-glue-s3-template.yaml \
             --stack-name "${STACK_SUFFIX}-athena-glue-s3-stack" \
             --parameter-overrides \
               Alias="${{ env.ALIAS }}-${{ env.ENVIRONMENT }}" \
+              AliasDb="${ALIAS_DB}" \
               AthenaDatabaseName="athena_db" \
             --capabilities CAPABILITY_IAM \
             --region ${{ env.AWS_REGION }} \
@@ -91,12 +94,16 @@ jobs:
       - name: Deploy Stack 2 - Bedrock Agent and Lambda
         run: |
           STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
+          ALIAS_FULL="${{ env.ALIAS }}-${{ env.ENVIRONMENT }}"
+          ALIAS_DB=$(echo "${ALIAS_FULL}" | tr '-' '_')
           aws cloudformation deploy \
             --template-file cfn/2-bedrock-agent-lambda-template.yaml \
             --stack-name "${STACK_SUFFIX}-bedrock-agent-lambda-stack" \
             --parameter-overrides \
               Alias="${{ env.ALIAS }}-${{ env.ENVIRONMENT }}" \
               FoundationModel="anthropic.claude-3-haiku-20240307-v1:0" \
+              AliasDb="${ALIAS_DB}" \
+              AthenaDatabaseName="athena_db" \
             --capabilities CAPABILITY_IAM \
             --region ${{ env.AWS_REGION }} \
             --no-fail-on-empty-changeset

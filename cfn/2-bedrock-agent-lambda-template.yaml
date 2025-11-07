@@ -9,6 +9,14 @@ Parameters:
   Alias:
     Type: String
     Default: '{ENTER ALIAS}'
+  AthenaDatabaseName:
+    Type: String
+    Default: 'athena_db'
+    Description: 'Base name of the Athena database (will be prefixed with the Alias)'
+  AliasDb:
+    Type: String
+    Default: '{ENTER ALIAS DB}'
+    Description: 'Sanitized alias (underscores only) used for Athena database names.'
 
 Resources:
   AthenaQueryLambdaExecutionRole:
@@ -320,7 +328,17 @@ Resources:
               }
       PromptOverrideConfiguration:
         PromptConfigurations:
-          - BasePromptTemplate: |
+          - PromptType: "ORCHESTRATION"
+            PromptState: "ENABLED"
+            PromptCreationMode: "OVERRIDDEN"
+            ParserMode: "DEFAULT"
+            InferenceConfiguration:
+              MaximumLength: 2048
+              StopSequences: [ "</invoke>", "</answer>", "</error>" ]
+              Temperature: 0
+              TopK: 250
+              TopP: 1
+            BasePromptTemplate: !Sub |
               {
                 "anthropic_version": "bedrock-2023-05-31",
                 "system": "
@@ -349,7 +367,7 @@ Resources:
 
               <athena_schemas>
                 <athena_schema> 
-                CREATE EXTERNAL TABLE ${Alias}_${AthenaDatabaseName}.customers ( 
+                CREATE EXTERNAL TABLE ${AliasDb}_${AthenaDatabaseName}.${AliasDb}_customers ( 
                 `Cust_Id` integer, 
                 `Customer` string, 
                 `Balance` integer, 
@@ -362,7 +380,7 @@ Resources:
                 </athena_schema>
 
                 <athena_schema> 
-                CREATE EXTERNAL TABLE ${Alias}_${AthenaDatabaseName}.procedures ( 
+                CREATE EXTERNAL TABLE ${AliasDb}_${AthenaDatabaseName}.${AliasDb}_procedures ( 
                 `Procedure_ID` string, 
                 `Procedure` string, 
                 `Category` string, 
@@ -381,15 +399,15 @@ Resources:
 
               <athena_examples>
                 <athena_example> 
-                SELECT * FROM ${Alias}_${AthenaDatabaseName}.procedures WHERE insurance = 'yes' OR insurance = 'no'; 
+                SELECT * FROM ${AliasDb}_${AthenaDatabaseName}.${AliasDb}_procedures WHERE insurance = 'yes' OR insurance = 'no'; 
                 </athena_example>
 
                 <athena_example> 
-                SELECT * FROM ${Alias}_${AthenaDatabaseName}.customers WHERE balance >= 0; 
+                SELECT * FROM ${AliasDb}_${AthenaDatabaseName}.${AliasDb}_customers WHERE balance >= 0; 
                 </athena_example>
               </athena_examples>
 
-                    You will ALWAYS follow the below guidelines when you are answering a question:
+                    You will ALWAYS follow the below guidelines when you are answering a question. The Athena database name is ${AliasDb}_${AthenaDatabaseName} and the tables are ${AliasDb}_customers and ${AliasDb}_procedures:
                     <guidelines>
                     - Think through the user's question, extract all data from the question and the previous conversations before creating a plan.
                     - Never assume any parameter values while invoking a function.
@@ -418,25 +436,13 @@ Resources:
                     }
                 ]
               }
-            InferenceConfiguration:
-              MaximumLength: 2048
-              StopSequences: [ "</invoke>", "</answer>", "</error>" ]
-              Temperature: 0
-              TopK: 250
-              TopP: 1
-            ParserMode: "DEFAULT"
-            PromptCreationMode: "OVERRIDDEN"
-            PromptState: "ENABLED"
-            PromptType: "ORCHESTRATION"
-
-  # Bedrock Agent Alias Resource
   BedrockAgentAlias:
     Type: 'AWS::Bedrock::AgentAlias'
     DependsOn: BedrockAgent
     Properties:
       AgentAliasName: !Sub '${Alias}-${AWS::Region}-alias'
       AgentId: !GetAtt BedrockAgent.AgentId
-      
+
 Outputs:
   BedrockAgentName:
     Description: 'Name of the Bedrock Agent created'
