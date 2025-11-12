@@ -1,0 +1,17 @@
+[server]
+port = 8501
+address = "0.0.0.0"
+headless = true
+enableCORS = true
+enableXsrfProtection = true
+allowRunOnSave = false
+# Allow WebSocket connections from any origin (App Runner handles security)
+allowOrigins = ["*"]
+
+[server.fileWatcherType]
+# Disable file watcher in containerized environment
+type = "none"
+
+[browser]
+gatherUsageStats = false
+
