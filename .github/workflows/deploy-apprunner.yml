@@ -61,6 +61,43 @@ jobs:
         
         if [ -z "$SERVICE_ARN" ]; then
           echo "Creating new App Runner service..."
+          # Get or create App Runner access role
+          ACCESS_ROLE_ARN=$(aws iam get-role --role-name AppRunnerECRAccessRole --query 'Role.Arn' --output text 2>/dev/null || echo "")
+          
+          if [ -z "$ACCESS_ROLE_ARN" ]; then
+            echo "Creating App Runner ECR access role..."
+            # Create trust policy for App Runner
+            cat > /tmp/apprunner-trust-policy.json << 'TRUSTEOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "build.apprunner.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+TRUSTEOF
+            
+            # Create the role
+            ACCESS_ROLE_ARN=$(aws iam create-role \
+              --role-name AppRunnerECRAccessRole \
+              --assume-role-policy-document file:///tmp/apprunner-trust-policy.json \
+              --query 'Role.Arn' \
+              --output text)
+            
+            # Attach ECR read policy
+            aws iam attach-role-policy \
+              --role-name AppRunnerECRAccessRole \
+              --policy-arn arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
+            
+            echo "Waiting for role to propagate..."
+            sleep 5
+          fi
+          
           aws apprunner create-service \
             --service-name ${{ env.SERVICE_NAME }} \
             --source-configuration "{
@@ -78,6 +115,9 @@ jobs:
               },
               \"AutoDeploymentsEnabled\": true
             }" \
+            --authentication-configuration "{
+              \"AccessRoleArn\": \"$ACCESS_ROLE_ARN\"
+            }" \
             --instance-configuration '{
               "Cpu": "0.25 vCPU",
               "Memory": "0.5 GB"
@@ -85,6 +125,9 @@ jobs:
             --region ${{ env.AWS_REGION }}
         else
           echo "Updating existing App Runner service..."
+          # Get access role for update (should already exist)
+          ACCESS_ROLE_ARN=$(aws iam get-role --role-name AppRunnerECRAccessRole --query 'Role.Arn' --output text 2>/dev/null || echo "")
+          
           aws apprunner update-service \
             --service-arn "$SERVICE_ARN" \
             --source-configuration "{
