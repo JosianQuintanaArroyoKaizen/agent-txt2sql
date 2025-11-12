@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - dev  # Also trigger on dev branch
     paths:
       - 'streamlit_app/**'
       - '.github/workflows/deploy-apprunner.yml'
