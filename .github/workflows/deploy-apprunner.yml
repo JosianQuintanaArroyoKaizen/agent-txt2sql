@@ -109,12 +109,12 @@ jobs:
                     \"AGENT_ID\": \"$AGENT_ID\",
                     \"AGENT_ALIAS_ID\": \"$AGENT_ALIAS_ID\"
                   }
-                },
-                \"AuthenticationConfiguration\": {
-                  \"AccessRoleArn\": \"$ACCESS_ROLE_ARN\"
                 }
               },
-              \"AutoDeploymentsEnabled\": true
+              \"AutoDeploymentsEnabled\": true,
+              \"AuthenticationConfiguration\": {
+                \"AccessRoleArn\": \"$ACCESS_ROLE_ARN\"
+              }
             }" \
             --instance-configuration '{
               "Cpu": "0.25 vCPU",
