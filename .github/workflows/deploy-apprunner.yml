@@ -123,6 +123,38 @@ jobs:
             --region ${{ env.AWS_REGION }}
         else
           echo "Updating existing App Runner service..."
+          # Wait for service to be in a ready state before updating
+          echo "Checking service status..."
+          MAX_WAIT=600  # 10 minutes max wait
+          WAIT_INTERVAL=30  # Check every 30 seconds
+          ELAPSED=0
+          
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            STATUS=$(aws apprunner describe-service \
+              --service-arn "$SERVICE_ARN" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'Service.Status' \
+              --output text)
+            
+            echo "Current service status: $STATUS"
+            
+            if [ "$STATUS" = "RUNNING" ] || [ "$STATUS" = "PAUSED" ]; then
+              echo "Service is ready for update"
+              break
+            elif [ "$STATUS" = "CREATE_FAILED" ] || [ "$STATUS" = "UPDATE_FAILED" ] || [ "$STATUS" = "DELETE_FAILED" ]; then
+              echo "Service is in failed state, attempting update anyway..."
+              break
+            else
+              echo "Service is still in $STATUS state, waiting $WAIT_INTERVAL seconds..."
+              sleep $WAIT_INTERVAL
+              ELAPSED=$((ELAPSED + WAIT_INTERVAL))
+            fi
+          done
+          
+          if [ $ELAPSED -ge $MAX_WAIT ]; then
+            echo "Warning: Service did not become ready within $MAX_WAIT seconds, attempting update anyway..."
+          fi
+          
           # Get access role for update (should already exist)
           ACCESS_ROLE_ARN=$(aws iam get-role --role-name AppRunnerECRAccessRole --query 'Role.Arn' --output text 2>/dev/null || echo "")
           
@@ -141,7 +173,10 @@ jobs:
                   }
                 }
               },
-              \"AutoDeploymentsEnabled\": true
+              \"AutoDeploymentsEnabled\": true,
+              \"AuthenticationConfiguration\": {
+                \"AccessRoleArn\": \"$ACCESS_ROLE_ARN\"
+              }
             }" \
             --region ${{ env.AWS_REGION }}
         fi
