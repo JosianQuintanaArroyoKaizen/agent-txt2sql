@@ -66,21 +66,19 @@ jobs:
           
           if [ -z "$ACCESS_ROLE_ARN" ]; then
             echo "Creating App Runner ECR access role..."
-            # Create trust policy for App Runner
-            cat > /tmp/apprunner-trust-policy.json << 'TRUSTEOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "build.apprunner.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-TRUSTEOF
+            # Create trust policy for App Runner using echo to avoid YAML heredoc issues
+            echo '{
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": {
+                    "Service": "build.apprunner.amazonaws.com"
+                  },
+                  "Action": "sts:AssumeRole"
+                }
+              ]
+            }' > /tmp/apprunner-trust-policy.json
             
             # Create the role
             ACCESS_ROLE_ARN=$(aws iam create-role \
