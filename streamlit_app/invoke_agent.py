@@ -18,10 +18,11 @@ import sys
 #echo $AWS_SESSION_TOKEN
 #os.environ["AWS_PROFILE"] = "agent-demo"
 
-agentId = "<YOUR AGENT ID>" #INPUT YOUR AGENT ID HERE
-agentAliasId = "<YOUR ALIAS ID>" # Hits draft alias, set to a specific alias id for a deployed version
+# Get configuration from environment variables (for App Runner) or use defaults
+agentId = os.environ.get("AGENT_ID", "<YOUR AGENT ID>")  # Set via environment variable in App Runner
+agentAliasId = os.environ.get("AGENT_ALIAS_ID", "<YOUR ALIAS ID>")  # Set via environment variable in App Runner
 
-theRegion = "us-west-2"
+theRegion = os.environ.get("AWS_REGION", "eu-central-1")  # Default to eu-central-1
 os.environ["AWS_REGION"] = theRegion
 region = os.environ.get("AWS_REGION")
 llm_response = ""
