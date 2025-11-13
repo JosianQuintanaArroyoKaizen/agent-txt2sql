@@ -1,113 +1,58 @@
-# Text2SQL Deployment Guide# Deployment Guide - Bedrock Text2SQL Agent
+# Deployment Guide - Bedrock Text2SQL Agent
 
+This guide provides instructions for deploying the Amazon Bedrock Text2SQL Agent using Infrastructure as Code (CloudFormation).
 
+## Prerequisites
 
-## Quick StartThis guide provides instructions for deploying the Amazon Bedrock Text2SQL Agent using Infrastructure as Code (CloudFormation).
+1. **AWS Account** with appropriate permissions
+2. **AWS CLI** installed and configured (`aws configure`)
+3. **Bedrock Model Access**:
+   - Navigate to Amazon Bedrock console → Model Access
+   - Enable: **Titan Embedding G1 - Text** and **Anthropic: Claude 3 Haiku**
 
+## Quick Start
 
-
-### Deploy to Dev## Prerequisites
+### Deploy All Stacks
 
 ```bash
-
-./deploy-production.sh1. **AWS Account** with appropriate permissions
-
-```2. **AWS CLI** installed and configured (`aws configure`)
-
-3. **Bedrock Model Access**:
-
-### Deploy to Prod   - Navigate to Amazon Bedrock console → Model Access
-
-```bash   - Enable: **Titan Embedding G1 - Text** and **Anthropic: Claude 3 Haiku**
-
-ENVIRONMENT=prod ./deploy-production.sh
-
-```## Quick Start
-
-
-
-## What Gets Deployed### Deploy All Stacks
-
-
-
-1. **CloudFormation Stacks**```bash
-
-   - Athena/Glue/S3 infrastructure# Make scripts executable
-
-   - Bedrock Agent with Lambda functionchmod +x deploy.sh cleanup.sh
-
-   - Agent execution role with proper permissions
+# Make scripts executable
+chmod +x deploy.sh cleanup.sh
 
 # Set environment variables (optional)
-
-2. **Agent Configuration**export AWS_REGION=us-west-2   # Target AWS region
-
-   - Updated instruction with EMIR test_population schemaexport ENVIRONMENT=dev        # Deployment environment (dev, prod, etc.)
-
-   - Output formatting (selects only relevant columns)export ALIAS=txt2sql         # Base alias used in resource names
-
-   - Query execution enabled
+export AWS_REGION=us-west-2   # Target AWS region
+export ENVIRONMENT=dev        # Deployment environment (dev, prod, etc.)
+export ALIAS=txt2sql         # Base alias used in resource names
 
 # Deploy all stacks
+./deploy.sh
+```
 
-3. **Frontend**./deploy.sh
-
-   - Lambda proxy with bedrock-runtime:InvokeAgent permissions```
-
-   - API Gateway
-
-   - S3 static website hostingThe deployment script will:
-
-   - Configured with correct agent ID and alias1. ✅ Validate AWS credentials
-
+The deployment script will:
+1. ✅ Validate AWS credentials
 2. ✅ Deploy Athena, Glue, and S3 infrastructure
-
-## Key Features3. ✅ Deploy Bedrock Agent and Lambda function
-
+3. ✅ Deploy Bedrock Agent and Lambda function
 4. ✅ Deploy EC2 instance with Streamlit app
+5. ✅ Output all necessary configuration details
 
-✅ **Automatic query execution** - Agent executes queries instead of just returning SQL5. ✅ Output all necessary configuration details
+### Post-Deployment Configuration
 
-✅ **Smart column selection** - Returns 5-10 relevant columns, not all 200+
+After deployment completes, configure the Streamlit app:
 
-✅ **EMIR data support** - Includes test_population table schema### Post-Deployment Configuration
-
-✅ **Production-ready permissions** - All IAM roles configured correctly
-
-✅ **Idempotent deployment** - Safe to run multiple timesAfter deployment completes, configure the Streamlit app:
-
-
-
-## Testing```bash
-
+```bash
 # Get the instance ID from deployment output
+export INSTANCE_ID="<your-instance-id>"
 
-After deployment, test with these queries:export INSTANCE_ID="<your-instance-id>"
+# Connect to EC2
+aws ec2-instance-connect ssh --instance-id $INSTANCE_ID --region us-west-2
 
-1. "How many records in test_population?"
+# Edit the invoke_agent.py file
+sudo vi /home/ubuntu/app/streamlit_app/invoke_agent.py
 
-2. "Show me 5 incidents with code E_A_C_09"# Connect to EC2
-
-3. "Show me incidents where valuation currency is EUR"aws ec2-instance-connect ssh --instance-id $INSTANCE_ID --region us-west-2
-
-
-
-Expected results:# Edit the invoke_agent.py file
-
-- ✅ Query executes (not just SQL returned)sudo vi /home/ubuntu/app/streamlit_app/invoke_agent.py
-
-- ✅ Results show 5-10 relevant columns (not 200+)
-
-- ✅ Actual EMIR data displayed# Update these two lines with your actual IDs:
-
+# Update these two lines with your actual IDs:
 # agentId = "<YOUR-AGENT-ID>"
+# agentAliasId = "<YOUR-ALIAS-ID>"
 
-## Troubleshooting# agentAliasId = "<YOUR-ALIAS-ID>"
-
-
-
-See `PRODUCTION-DEPLOYMENT-GUIDE.md` for detailed troubleshooting and architecture information.# Start the Streamlit app
-
+# Start the Streamlit app
 streamlit run /home/ubuntu/app/streamlit_app/app.py
 ```
 
