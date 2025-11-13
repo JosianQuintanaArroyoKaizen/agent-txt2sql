@@ -3,7 +3,7 @@ port = 8501
 address = "0.0.0.0"
 headless = true
 enableCORS = true
-enableXsrfProtection = true
+enableXsrfProtection = false
 allowRunOnSave = false
 # Allow WebSocket connections from any origin (App Runner handles security)
 allowOrigins = ["*"]
