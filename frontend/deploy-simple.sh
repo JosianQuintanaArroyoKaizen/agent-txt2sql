@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 
 REGION="${AWS_REGION:-eu-central-1}"
 AGENT_ID="${AGENT_ID:-G1RWZFEZ4O}"
-AGENT_ALIAS_ID="${AGENT_ALIAS_ID:-BW3ALCWPTJ}"
+AGENT_ALIAS_ID="${AGENT_ALIAS_ID:-TSTALIASID}"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
 echo -e "${BLUE}========================================${NC}"
@@ -66,9 +66,59 @@ EOF
         --policy-arn arn:aws:iam::aws:policy/AmazonBedrockFullAccess \
         --region $REGION
     
-    echo -e "${GREEN}✅ Role created${NC}"
+    # Add inline policy for bedrock-runtime:InvokeAgent
+    cat > /tmp/bedrock-runtime-policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeAgent",
+        "bedrock-runtime:InvokeModel",
+        "bedrock-runtime:InvokeAgent"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+    
+    aws iam put-role-policy \
+        --role-name $ROLE_NAME \
+        --policy-name "BedrockAgentInvokePolicy" \
+        --policy-document file:///tmp/bedrock-runtime-policy.json \
+        --region $REGION
+    
+    echo -e "${GREEN}✅ Role created with Bedrock runtime permissions${NC}"
 else
-    echo -e "${GREEN}✅ Role already exists${NC}"
+    echo -e "${GREEN}✅ Role already exists, ensuring Bedrock runtime permissions...${NC}"
+    
+    # Ensure inline policy exists even if role already exists
+    cat > /tmp/bedrock-runtime-policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeAgent",
+        "bedrock-runtime:InvokeModel",
+        "bedrock-runtime:InvokeAgent"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+    
+    aws iam put-role-policy \
+        --role-name $ROLE_NAME \
+        --policy-name "BedrockAgentInvokePolicy" \
+        --policy-document file:///tmp/bedrock-runtime-policy.json \
+        --region $REGION >/dev/null
 fi
 
 ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${ROLE_NAME}"
