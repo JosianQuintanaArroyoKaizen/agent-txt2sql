@@ -102,7 +102,7 @@ function handleKeyPress(event) {
 }
 
 // API endpoint - Update this with your Lambda/API Gateway URL after deployment
-let API_ENDPOINT = localStorage.getItem('apiEndpoint') || '';
+let API_ENDPOINT = localStorage.getItem('apiEndpoint') || 'https://f7tvfb3c2c.execute-api.eu-central-1.amazonaws.com/prod/chat';
 
 // Set API endpoint
 function setApiEndpoint() {
@@ -124,13 +124,9 @@ async function sendQuestion() {
         return;
     }
     
-    // Check if API endpoint is configured
+    // Ensure API endpoint is set (use hardcoded default if not)
     if (!API_ENDPOINT) {
-        showStatus('Please configure API endpoint first. Click "Set API Endpoint" button.', 'error');
-        if (confirm('Set API endpoint now?')) {
-            setApiEndpoint();
-        }
-        return;
+        API_ENDPOINT = 'https://f7tvfb3c2c.execute-api.eu-central-1.amazonaws.com/prod/chat';
     }
     
     // Validate config (optional, can use Lambda defaults)
@@ -204,12 +200,10 @@ window.addEventListener('DOMContentLoaded', () => {
     loadConfig();
     loadHistory();
     
-    // Load API endpoint
-    API_ENDPOINT = localStorage.getItem('apiEndpoint') || '';
+    // Load API endpoint (fallback to hardcoded)
+    API_ENDPOINT = localStorage.getItem('apiEndpoint') || 'https://f7tvfb3c2c.execute-api.eu-central-1.amazonaws.com/prod/chat';
     if (API_ENDPOINT) {
-        showStatus('API endpoint configured', 'success');
-    } else {
-        showStatus('Please set API endpoint before using the chat', 'error');
+        showStatus('Ready to chat! Ask about your data.', 'success');
     }
 });
 
