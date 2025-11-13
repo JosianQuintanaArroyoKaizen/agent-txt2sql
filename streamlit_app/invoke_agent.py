@@ -79,70 +79,180 @@ def askQuestion(question, url, endSession=False):
         "endSession": endSession
     }
     
-    # send request
-    response = sigv4_request(
-        url,
-        method='POST',
-        service='bedrock',
-        headers={
-            'content-type': 'application/json', 
-            'accept': 'application/json',
-        },
-        region=theRegion,
-        body=json.dumps(myobj)
-    )
-    
-    return decode_response(response)
+    try:
+        # send request
+        response = sigv4_request(
+            url,
+            method='POST',
+            service='bedrock',
+            headers={
+                'content-type': 'application/json', 
+                'accept': 'application/json',
+            },
+            region=theRegion,
+            body=json.dumps(myobj)
+        )
+        
+        return decode_response(response)
+    except Exception as e:
+        error_msg = f"Error making request to Bedrock agent: {str(e)}"
+        print(error_msg)
+        return error_msg, error_msg
 
 
 
 
 def decode_response(response):
+    # Check HTTP status code first
+    if not hasattr(response, 'status_code'):
+        error_msg = f"Invalid response object: {type(response)}"
+        return error_msg, f"Error: {error_msg}"
+    
+    if response.status_code != 200:
+        error_text = ""
+        try:
+            error_text = response.text
+        except:
+            error_text = "Unable to read error message"
+        error_msg = f"HTTP Error {response.status_code}: {error_text}"
+        return error_msg, f"Error: {error_msg}"
+    
     # Create a StringIO object to capture print statements
     captured_output = io.StringIO()
     sys.stdout = captured_output
 
-    # Your existing logic
+    # Your existing logic - try to read the response
     string = ""
-    for line in response.iter_content():
-        try:
-            string += line.decode(encoding='utf-8')
-        except:
-            continue
+    try:
+        # First try to use iter_content for streaming responses
+        if hasattr(response, 'iter_content'):
+            for line in response.iter_content(chunk_size=None):
+                try:
+                    if isinstance(line, bytes):
+                        string += line.decode(encoding='utf-8')
+                    else:
+                        string += str(line)
+                except:
+                    continue
+        # Fallback to response.text if iter_content is not available or fails
+        if not string and hasattr(response, 'text'):
+            string = response.text
+        # Last fallback to response.content
+        if not string and hasattr(response, 'content'):
+            try:
+                string = response.content.decode('utf-8')
+            except:
+                string = str(response.content)
+    except Exception as e:
+        error_msg = f"Error reading response: {str(e)}"
+        sys.stdout = sys.__stdout__
+        return error_msg, error_msg
 
     print("Decoded response", string)
-    split_response = string.split(":message-type")
-    print(f"Split Response: {split_response}")
-    print(f"length of split: {len(split_response)}")
+    
+    # Check if response is empty
+    if not string or len(string.strip()) == 0:
+        error_msg = "Empty response received from Bedrock agent"
+        sys.stdout = sys.__stdout__
+        return error_msg, error_msg
+    
+    final_response = ""
+    llm_response = ""
+    
+    try:
+        split_response = string.split(":message-type")
+        print(f"Split Response: {split_response}")
+        print(f"length of split: {len(split_response)}")
 
-    for idx in range(len(split_response)):
-        if "bytes" in split_response[idx]:
-            #print(f"Bytes found index {idx}")
-            encoded_last_response = split_response[idx].split("\"")[3]
-            decoded = base64.b64decode(encoded_last_response)
-            final_response = decoded.decode('utf-8')
-            print(final_response)
+        # Try to find final response in bytes format
+        for idx in range(len(split_response)):
+            if "bytes" in split_response[idx]:
+                try:
+                    parts = split_response[idx].split("\"")
+                    if len(parts) > 3:
+                        encoded_last_response = parts[3]
+                        decoded = base64.b64decode(encoded_last_response)
+                        final_response = decoded.decode('utf-8')
+                        print(f"Found response in bytes format: {final_response}")
+                        break
+                except Exception as e:
+                    print(f"Error decoding bytes at index {idx}: {e}")
+                    continue
+            else:
+                print(f"no bytes at index {idx}")
+                print(split_response[idx])
+        
+        # If not found in bytes format, try to find in finalResponse format
+        if not final_response:
+            last_response = split_response[-1]
+            print(f"Last Response: {last_response}")
+            if "bytes" in last_response:
+                try:
+                    print("Bytes in last response")
+                    parts = last_response.split("\"")
+                    if len(parts) > 3:
+                        encoded_last_response = parts[3]
+                        decoded = base64.b64decode(encoded_last_response)
+                        final_response = decoded.decode('utf-8')
+                except Exception as e:
+                    print(f"Error decoding bytes in last response: {e}")
+            else:
+                print("no bytes in last response, trying finalResponse format")
+                try:
+                    final_response_idx = string.find('finalResponse')
+                    if final_response_idx != -1:
+                        part1 = string[final_response_idx + len('finalResponse":'):] 
+                        part2_end = part1.find('"}')
+                        if part2_end != -1:
+                            part2 = part1[:part2_end + 2]
+                            parsed = json.loads(part2)
+                            if 'text' in parsed:
+                                final_response = parsed['text']
+                            else:
+                                # Try to get the response text from other possible keys
+                                final_response = str(parsed)
+                        else:
+                            # Try to parse the entire response as JSON
+                            try:
+                                parsed = json.loads(string)
+                                if 'finalResponse' in parsed and 'text' in parsed['finalResponse']:
+                                    final_response = parsed['finalResponse']['text']
+                            except:
+                                pass
+                    else:
+                        # Try parsing the entire string as JSON
+                        try:
+                            parsed = json.loads(string)
+                            # Look for common response patterns
+                            if isinstance(parsed, dict):
+                                if 'completion' in parsed:
+                                    final_response = parsed['completion']
+                                elif 'output' in parsed:
+                                    final_response = parsed['output']
+                                elif 'text' in parsed:
+                                    final_response = parsed['text']
+                                else:
+                                    final_response = str(parsed)
+                        except:
+                            # If all parsing fails, use the raw string
+                            final_response = string
+                except Exception as e:
+                    print(f"Error parsing finalResponse: {e}")
+                    final_response = string  # Fallback to raw string
+        
+        # Clean up the response
+        if final_response:
+            llm_response = final_response.replace("\"", "")
+            llm_response = llm_response.replace("{input:{value:", "")
+            llm_response = llm_response.replace(",source:null}}", "")
         else:
-            print(f"no bytes at index {idx}")
-            print(split_response[idx])
+            # If we still don't have a response, use the raw string
+            llm_response = string if string else "No response received from agent"
             
-    last_response = split_response[-1]
-    print(f"Lst Response: {last_response}")
-    if "bytes" in last_response:
-        print("Bytes in last response")
-        encoded_last_response = last_response.split("\"")[3]
-        decoded = base64.b64decode(encoded_last_response)
-        final_response = decoded.decode('utf-8')
-    else:
-        print("no bytes in last response")
-        part1 = string[string.find('finalResponse')+len('finalResponse":'):] 
-        part2 = part1[:part1.find('"}')+2]
-        final_response = json.loads(part2)['text']
-
-    final_response = final_response.replace("\"", "")
-    final_response = final_response.replace("{input:{value:", "")
-    final_response = final_response.replace(",source:null}}", "")
-    llm_response = final_response
+    except Exception as e:
+        error_msg = f"Error parsing response: {str(e)}"
+        print(error_msg)
+        llm_response = f"{error_msg}. Raw response: {string[:500]}"  # Include first 500 chars for debugging
 
     # Restore original stdout
     sys.stdout = sys.__stdout__

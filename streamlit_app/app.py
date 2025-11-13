@@ -61,26 +61,54 @@ if submit_button and prompt:
         "sessionId": "MYSESSION",
         "question": prompt
     }
-    response = agenthelper.lambda_handler(event, None)
+    
+    try:
+        response = agenthelper.lambda_handler(event, None)
+    except Exception as e:
+        st.error(f"Error calling agent: {str(e)}")
+        response = None
     
     try:
         # Parse the JSON string
         if response and 'body' in response and response['body']:
-            response_data = json.loads(response['body'])
-            print("TRACE & RESPONSE DATA ->  ", response_data)
+            body_content = response['body'].strip()
+            if body_content:
+                response_data = json.loads(body_content)
+                print("TRACE & RESPONSE DATA ->  ", response_data)
+            else:
+                st.error("Empty response body received from agent")
+                response_data = None
         else:
-            print("Invalid or empty response received")
+            error_msg = "Invalid or empty response received"
+            if response:
+                error_msg += f". Response keys: {list(response.keys())}"
+            st.error(error_msg)
+            response_data = None
     except json.JSONDecodeError as e:
-        print("JSON decoding error:", e)
+        error_msg = f"JSON decoding error: {str(e)}"
+        if response and 'body' in response:
+            error_msg += f"\nResponse body (first 500 chars): {response['body'][:500]}"
+        st.error(error_msg)
         response_data = None 
     
     try:
-        # Extract the response and trace data
-        all_data = format_response(response_data['response'])
-        the_response = response_data['trace_data']
-    except:
+        if response_data:
+            # Extract the response and trace data
+            if 'response' in response_data and 'trace_data' in response_data:
+                all_data = format_response(response_data['response'])
+                the_response = response_data['trace_data']
+            elif 'error' in response_data:
+                all_data = "..."
+                the_response = f"Error: {response_data['error']}"
+            else:
+                all_data = "..."
+                the_response = f"Unexpected response format. Keys: {list(response_data.keys())}"
+        else:
+            all_data = "..." 
+            the_response = "Apologies, but an error occurred. Please check the error messages above and try again."
+    except Exception as e:
         all_data = "..." 
-        the_response = "Apologies, but an error occurred. Please rerun the application" 
+        the_response = f"Error processing response: {str(e)}" 
 
     # Use trace_data and formatted_response as needed
     st.sidebar.text_area("", value=all_data, height=300)
