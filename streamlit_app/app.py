@@ -128,7 +128,12 @@ if submit_button and prompt:
                 
                 # Handle different body types
                 if body_content is None:
-                    st.error("Response body is None")
+                    st.error("❌ Response body is None")
+                    st.warning("**Possible causes:**")
+                    st.write("1. Bedrock Agent API returned empty response")
+                    st.write("2. Check App Runner environment variables (AGENT_ID, AGENT_ALIAS_ID)")
+                    st.write("3. Check AWS credentials and permissions")
+                    st.write("4. Check CloudWatch logs for App Runner service")
                     response_data = None
                 elif isinstance(body_content, str):
                     body_content = body_content.strip()
@@ -137,12 +142,24 @@ if submit_button and prompt:
                             response_data = json.loads(body_content)
                             st.success("✅ Successfully parsed JSON response")
                         except json.JSONDecodeError as e:
-                            error_msg = f"JSON decoding error: {str(e)}\n"
-                            error_msg += f"Body content (first 500 chars): {body_content[:500]}"
+                            error_msg = f"❌ JSON decoding error: {str(e)}\n"
+                            error_msg += f"**Body content (first 500 chars):** {body_content[:500]}"
                             st.error(error_msg)
+                            st.warning("**This usually means:**")
+                            st.write("- Backend returned non-JSON response (HTML error page?)")
+                            st.write("- Response was truncated or corrupted")
+                            st.write("- Check backend logs for actual error")
                             response_data = None
                     else:
-                        st.error("Empty response body string received from agent")
+                        st.error("❌ Empty response body string received from agent")
+                        st.warning("**Troubleshooting steps:**")
+                        st.write("1. **Check App Runner environment variables:**")
+                        st.code("aws apprunner describe-service --service-arn <SERVICE_ARN> --region eu-central-1 --query 'Service.SourceConfiguration.ImageRepository.ImageConfiguration.RuntimeEnvironmentVariables'")
+                        st.write("2. **Check CloudWatch Logs:**")
+                        st.code("aws logs tail /aws/apprunner/<SERVICE_NAME>/<INSTANCE_ID> --follow --region eu-central-1")
+                        st.write("3. **Verify Bedrock Agent is accessible:**")
+                        st.code("aws bedrock-agent describe-agent --agent-id <AGENT_ID> --region eu-central-1")
+                        st.write("4. **Check IAM permissions** for App Runner instance role")
                         response_data = None
                 elif isinstance(body_content, dict):
                     # Body is already a dict, use it directly
