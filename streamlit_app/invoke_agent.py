@@ -205,37 +205,60 @@ def decode_response(response):
                         part2_end = part1.find('"}')
                         if part2_end != -1:
                             part2 = part1[:part2_end + 2]
-                            parsed = json.loads(part2)
-                            if 'text' in parsed:
-                                final_response = parsed['text']
+                            if part2 and part2.strip():
+                                try:
+                                    parsed = json.loads(part2)
+                                    if 'text' in parsed:
+                                        final_response = parsed['text']
+                                    else:
+                                        # Try to get the response text from other possible keys
+                                        final_response = str(parsed)
+                                except json.JSONDecodeError as je:
+                                    print(f"JSON decode error parsing part2: {je}, part2: {part2[:100]}")
+                                    final_response = string  # Fallback to raw string
                             else:
-                                # Try to get the response text from other possible keys
-                                final_response = str(parsed)
+                                final_response = string  # Fallback to raw string
                         else:
                             # Try to parse the entire response as JSON
                             try:
-                                parsed = json.loads(string)
-                                if 'finalResponse' in parsed and 'text' in parsed['finalResponse']:
-                                    final_response = parsed['finalResponse']['text']
-                            except:
+                                if string and string.strip():
+                                    parsed = json.loads(string)
+                                    if 'finalResponse' in parsed and 'text' in parsed['finalResponse']:
+                                        final_response = parsed['finalResponse']['text']
+                            except json.JSONDecodeError as je:
+                                print(f"JSON decode error parsing full string: {je}")
+                                pass
+                            except Exception as e:
+                                print(f"Error parsing full string: {e}")
                                 pass
                     else:
                         # Try parsing the entire string as JSON
                         try:
-                            parsed = json.loads(string)
-                            # Look for common response patterns
-                            if isinstance(parsed, dict):
-                                if 'completion' in parsed:
-                                    final_response = parsed['completion']
-                                elif 'output' in parsed:
-                                    final_response = parsed['output']
-                                elif 'text' in parsed:
-                                    final_response = parsed['text']
+                            # Check if string is empty before parsing
+                            if not string or not string.strip():
+                                final_response = "No response content received from agent"
+                            else:
+                                parsed = json.loads(string)
+                                # Look for common response patterns
+                                if isinstance(parsed, dict):
+                                    if 'completion' in parsed:
+                                        final_response = parsed['completion']
+                                    elif 'output' in parsed:
+                                        final_response = parsed['output']
+                                    elif 'text' in parsed:
+                                        final_response = parsed['text']
+                                    else:
+                                        final_response = str(parsed)
                                 else:
                                     final_response = str(parsed)
-                        except:
+                        except json.JSONDecodeError as je:
+                            # If JSON parsing fails, use the raw string
+                            print(f"JSON decode error in decode_response: {je}")
+                            final_response = string if string else "No response content received from agent"
+                        except Exception as e:
                             # If all parsing fails, use the raw string
-                            final_response = string
+                            print(f"Error parsing response as JSON: {e}")
+                            final_response = string if string else "No response content received from agent"
                 except Exception as e:
                     print(f"Error parsing finalResponse: {e}")
                     final_response = string  # Fallback to raw string
@@ -301,11 +324,11 @@ def lambda_handler(event, context):
     try: 
         response, trace_data = askQuestion(question, url, endSession)
         
-        # Ensure response and trace_data are strings
-        if response is None:
-            response = ""
-        if trace_data is None:
-            trace_data = ""
+        # Ensure response and trace_data are strings and not empty
+        if response is None or (isinstance(response, str) and not response.strip()):
+            response = "No response content received from agent"
+        if trace_data is None or (isinstance(trace_data, str) and not trace_data.strip()):
+            trace_data = "No trace data available"
         
         # Ensure both are strings
         if not isinstance(response, str):
@@ -313,18 +336,36 @@ def lambda_handler(event, context):
         if not isinstance(trace_data, str):
             trace_data = str(trace_data)
         
+        # Final check - ensure they're not empty after conversion
+        if not response.strip():
+            response = "No response content received from agent"
+        if not trace_data.strip():
+            trace_data = "No trace data available"
+        
         result = {
             "response": response,
             "trace_data": trace_data
         }
         
-        body_json = json.dumps(result)
-        print(f"Returning response with body length: {len(body_json)}")
-        
-        return {
-            "status_code": 200,
-            "body": body_json
-        }
+        try:
+            body_json = json.dumps(result)
+            print(f"Returning response with body length: {len(body_json)}")
+            
+            # Double-check that body_json is not empty
+            if not body_json or not body_json.strip():
+                body_json = json.dumps({"error": "Empty response body generated", "response": response, "trace_data": trace_data})
+                print("WARNING: Generated empty body, using fallback")
+            
+            return {
+                "status_code": 200,
+                "body": body_json
+            }
+        except Exception as json_error:
+            print(f"ERROR serializing response to JSON: {json_error}")
+            return {
+                "status_code": 500,
+                "body": json.dumps({"error": f"Error serializing response: {str(json_error)}", "response_preview": str(response)[:100]})
+            }
     except Exception as e:
         error_msg = f"Error in lambda_handler: {str(e)}"
         print(f"ERROR: {error_msg}")

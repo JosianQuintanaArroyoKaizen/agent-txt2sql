@@ -80,19 +80,23 @@ def format_response(response_body):
 if submit_button and prompt:
     # Wrap everything in a try-except to catch ALL errors
     try:
+        # Initialize variables
+        response = None
+        response_data = None
+        
+        # Log to console AND display
+        st.write("🔄 Processing your question...")
+        st.write(f"📝 Question: {prompt}")
+        
         event = {
             "sessionId": "MYSESSION",
             "question": prompt
         }
         
-        response = None
-        response_data = None
-        
-        # Log to console AND display
-        import sys
+        # Log to stderr for server logs
         print("=" * 50, file=sys.stderr)
         print(f"Processing question: {prompt}", file=sys.stderr)
-        st.write("🔄 Processing your question...")
+        print(f"Event: {event}", file=sys.stderr)
         
         try:
             response = agenthelper.lambda_handler(event, None)
