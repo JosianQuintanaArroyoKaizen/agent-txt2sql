@@ -148,7 +148,10 @@ def decode_response(response):
         sys.stdout = sys.__stdout__
         return error_msg, error_msg
 
-    print("Decoded response", string)
+    print("=" * 80)
+    print("RAW RESPONSE FROM BEDROCK (first 2000 chars):")
+    print(string[:2000] if string else "EMPTY")
+    print("=" * 80)
     
     # Check if response is empty
     if not string or len(string.strip()) == 0:
@@ -271,10 +274,19 @@ def decode_response(response):
         else:
             # If we still don't have a response, use the raw string
             llm_response = string if string else "No response received from agent"
+        
+        print("=" * 80)
+        print(f"EXTRACTED final_response length: {len(final_response) if final_response else 0}")
+        print(f"EXTRACTED final_response preview: {final_response[:500] if final_response else 'EMPTY'}")
+        print(f"EXTRACTED llm_response length: {len(llm_response) if llm_response else 0}")
+        print(f"EXTRACTED llm_response preview: {llm_response[:500] if llm_response else 'EMPTY'}")
+        print("=" * 80)
             
     except Exception as e:
         error_msg = f"Error parsing response: {str(e)}"
         print(error_msg)
+        import traceback
+        print(traceback.format_exc())
         llm_response = f"{error_msg}. Raw response: {string[:500]}"  # Include first 500 chars for debugging
 
     # Restore original stdout
@@ -282,6 +294,12 @@ def decode_response(response):
 
     # Get the string from captured output
     captured_string = captured_output.getvalue()
+    
+    print("=" * 80)
+    print(f"RETURNING - captured_string length: {len(captured_string) if captured_string else 0}")
+    print(f"RETURNING - llm_response length: {len(llm_response) if llm_response else 0}")
+    print(f"RETURNING - llm_response: {llm_response[:200] if llm_response else 'EMPTY'}")
+    print("=" * 80)
 
     # Return both the captured output and the final response
     return captured_string, llm_response
@@ -322,30 +340,49 @@ def lambda_handler(event, context):
 
     
     try: 
-        response, trace_data = askQuestion(question, url, endSession)
+        # askQuestion returns (captured_string, llm_response)
+        # captured_string = trace/debug output
+        # llm_response = actual agent response text
+        trace_output, agent_response = askQuestion(question, url, endSession)
         
-        # Ensure response and trace_data are strings and not empty
-        if response is None or (isinstance(response, str) and not response.strip()):
-            response = "No response content received from agent"
-        if trace_data is None or (isinstance(trace_data, str) and not trace_data.strip()):
-            trace_data = "No trace data available"
+        print("=" * 80)
+        print(f"lambda_handler - after askQuestion:")
+        print(f"  trace_output type: {type(trace_output)}, length: {len(str(trace_output)) if trace_output else 0}")
+        print(f"  trace_output preview: {str(trace_output)[:300] if trace_output else 'EMPTY'}")
+        print(f"  agent_response type: {type(agent_response)}, length: {len(str(agent_response)) if agent_response else 0}")
+        print(f"  agent_response preview: {str(agent_response)[:300] if agent_response else 'EMPTY'}")
+        print("=" * 80)
+        
+        # Ensure trace_output and agent_response are strings and not empty
+        if trace_output is None:
+            trace_output = ""
+        if agent_response is None:
+            agent_response = ""
         
         # Ensure both are strings
-        if not isinstance(response, str):
-            response = str(response)
-        if not isinstance(trace_data, str):
-            trace_data = str(trace_data)
+        if not isinstance(trace_output, str):
+            trace_output = str(trace_output)
+        if not isinstance(agent_response, str):
+            agent_response = str(agent_response)
         
         # Final check - ensure they're not empty after conversion
-        if not response.strip():
-            response = "No response content received from agent"
-        if not trace_data.strip():
-            trace_data = "No trace data available"
+        if not trace_output.strip():
+            trace_output = "No trace data available"
+        if not agent_response.strip():
+            agent_response = "No response content received from agent"
         
+        # Note: response = trace output, trace_data = actual agent response
+        # This matches what the frontend expects
         result = {
-            "response": response,
-            "trace_data": trace_data
+            "response": trace_output,  # Debug/trace output goes here
+            "trace_data": agent_response  # Actual agent answer goes here
         }
+        
+        print("=" * 80)
+        print(f"lambda_handler - result dict:")
+        print(f"  result['response'] length: {len(result['response'])}")
+        print(f"  result['trace_data'] length: {len(result['trace_data'])}")
+        print("=" * 80)
         
         try:
             body_json = json.dumps(result)
