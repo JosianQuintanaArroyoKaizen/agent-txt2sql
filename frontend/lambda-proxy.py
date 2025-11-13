@@ -72,59 +72,73 @@ def lambda_handler(event, context):
             for event in event_stream:
                 if 'chunk' in event:
                     chunk = event['chunk']
+                    
+                    # Check if chunk has bytes (base64 encoded)
                     if 'bytes' in chunk:
                         try:
-                            # Decode base64 - handle padding issues
-                            bytes_data = str(chunk['bytes'])  # Ensure it's a string
+                            bytes_data = chunk['bytes']
                             
-                            # Remove any whitespace
-                            bytes_data = bytes_data.strip()
-                            
-                            # Add padding if needed (base64 strings must be multiple of 4)
-                            missing_padding = len(bytes_data) % 4
-                            if missing_padding:
-                                bytes_data += '=' * (4 - missing_padding)
-                            
-                            # Decode base64
-                            try:
-                                decoded_bytes = base64.b64decode(bytes_data, validate=True)
-                                decoded = decoded_bytes.decode('utf-8')
-                                
-                                # Try to parse as JSON
+                            # Handle different data types
+                            if isinstance(bytes_data, bytes):
+                                # Already bytes, decode directly
                                 try:
-                                    parsed = json.loads(decoded)
-                                    if isinstance(parsed, dict):
-                                        if 'text' in parsed:
+                                    decoded = bytes_data.decode('utf-8')
+                                    try:
+                                        parsed = json.loads(decoded)
+                                        if isinstance(parsed, dict) and 'text' in parsed:
                                             agent_response += parsed['text']
-                                        elif 'completion' in parsed:
-                                            agent_response += parsed['completion']
                                         else:
-                                            # Try to find any string value
-                                            for key, value in parsed.items():
-                                                if isinstance(value, str) and value.strip():
-                                                    agent_response += value
-                                                    break
-                                    else:
-                                        agent_response += str(parsed)
-                                except json.JSONDecodeError:
-                                    # If not JSON, use the decoded string directly
-                                    agent_response += decoded
-                            except Exception as decode_error:
-                                print(f"Base64 decode error: {decode_error}, data length: {len(bytes_data)}")
-                                # Try without validation
+                                            agent_response += str(parsed)
+                                    except:
+                                        agent_response += decoded
+                                except:
+                                    pass
+                            else:
+                                # String - try base64 decode
+                                bytes_data = str(bytes_data).strip()
+                                
+                                # Skip if it doesn't look like base64
+                                if not all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=' for c in bytes_data):
+                                    print(f"Skipping non-base64 data: {bytes_data[:50]}")
+                                    continue
+                                
+                                # Add padding if needed
+                                missing_padding = len(bytes_data) % 4
+                                if missing_padding:
+                                    bytes_data += '=' * (4 - missing_padding)
+                                
                                 try:
                                     decoded_bytes = base64.b64decode(bytes_data, validate=False)
                                     decoded = decoded_bytes.decode('utf-8', errors='ignore')
-                                    agent_response += decoded
-                                except:
+                                    
+                                    # Try to parse as JSON
+                                    try:
+                                        parsed = json.loads(decoded)
+                                        if isinstance(parsed, dict):
+                                            if 'text' in parsed:
+                                                agent_response += parsed['text']
+                                            elif 'completion' in parsed:
+                                                agent_response += parsed['completion']
+                                            else:
+                                                # Look for any text-like value
+                                                for key, value in parsed.items():
+                                                    if isinstance(value, str) and len(value) > 5:
+                                                        agent_response += value
+                                                        break
+                                        else:
+                                            agent_response += str(parsed)
+                                    except json.JSONDecodeError:
+                                        # Not JSON, use as text
+                                        agent_response += decoded
+                                except Exception as decode_error:
+                                    print(f"Base64 decode failed: {decode_error}")
+                                    # Skip this chunk
                                     pass
                         except Exception as e:
-                            # If base64 decode fails, try to get text directly
-                            print(f"Error processing chunk: {e}")
-                            if 'text' in chunk:
-                                agent_response += str(chunk['text'])
-                    elif 'text' in chunk:
-                        # Direct text response
+                            print(f"Error processing bytes chunk: {e}")
+                    
+                    # Check for direct text field
+                    if 'text' in chunk and 'bytes' not in chunk:
                         agent_response += str(chunk['text'])
         
         return {
