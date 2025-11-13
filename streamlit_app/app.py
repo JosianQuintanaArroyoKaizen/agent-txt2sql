@@ -41,6 +41,22 @@ if 'history' not in st.session_state:
 
 # Function to parse and format response
 def format_response(response_body):
+    # Handle None or empty input
+    if response_body is None:
+        return "..."
+    
+    # If it's already a DataFrame, return it
+    if isinstance(response_body, pd.DataFrame):
+        return response_body
+    
+    # Convert to string if not already
+    if not isinstance(response_body, str):
+        response_body = str(response_body)
+    
+    # Handle empty string
+    if not response_body.strip():
+        return "..."
+    
     try:
         # Try to load the response as JSON
         data = json.loads(response_body)
@@ -52,6 +68,9 @@ def format_response(response_body):
     except json.JSONDecodeError:
         # If response is not JSON, return as is
         return response_body
+    except Exception as e:
+        # Catch any other errors
+        return f"Error formatting response: {str(e)}"
 
 
 
@@ -62,33 +81,72 @@ if submit_button and prompt:
         "question": prompt
     }
     
+    response = None
+    response_data = None
+    
     try:
         response = agenthelper.lambda_handler(event, None)
+        st.write("🔍 Debug: Response received", response)  # Debug output
     except Exception as e:
-        st.error(f"Error calling agent: {str(e)}")
+        error_msg = f"Error calling agent: {str(e)}"
+        st.error(error_msg)
+        st.exception(e)  # Show full traceback
         response = None
+    
+    # Debug: Show response structure
+    if response:
+        st.write("🔍 Debug: Response type:", type(response))
+        st.write("🔍 Debug: Response keys:", list(response.keys()) if isinstance(response, dict) else "Not a dict")
+        if isinstance(response, dict) and 'body' in response:
+            st.write("🔍 Debug: Body type:", type(response['body']))
+            st.write("🔍 Debug: Body length:", len(str(response['body'])) if response['body'] else 0)
+            st.write("🔍 Debug: Body preview:", str(response['body'])[:200] if response['body'] else "Empty")
     
     try:
         # Parse the JSON string
-        if response and 'body' in response and response['body']:
-            body_content = response['body'].strip()
-            if body_content:
-                response_data = json.loads(body_content)
-                print("TRACE & RESPONSE DATA ->  ", response_data)
+        if response and isinstance(response, dict) and 'body' in response:
+            body_content = response['body']
+            
+            # Handle different body types
+            if body_content is None:
+                st.error("Response body is None")
+                response_data = None
+            elif isinstance(body_content, str):
+                body_content = body_content.strip()
+                if body_content:
+                    try:
+                        response_data = json.loads(body_content)
+                        st.success("✅ Successfully parsed JSON response")
+                    except json.JSONDecodeError as e:
+                        error_msg = f"JSON decoding error: {str(e)}\n"
+                        error_msg += f"Body content (first 500 chars): {body_content[:500]}"
+                        st.error(error_msg)
+                        response_data = None
+                else:
+                    st.error("Empty response body string received from agent")
+                    response_data = None
+            elif isinstance(body_content, dict):
+                # Body is already a dict, use it directly
+                response_data = body_content
+                st.success("✅ Response body is already a dictionary")
             else:
-                st.error("Empty response body received from agent")
+                st.error(f"Unexpected body type: {type(body_content)}")
                 response_data = None
         else:
             error_msg = "Invalid or empty response received"
             if response:
-                error_msg += f". Response keys: {list(response.keys())}"
+                if isinstance(response, dict):
+                    error_msg += f". Response keys: {list(response.keys())}"
+                else:
+                    error_msg += f". Response type: {type(response)}"
+            else:
+                error_msg += ". Response is None"
             st.error(error_msg)
             response_data = None
-    except json.JSONDecodeError as e:
-        error_msg = f"JSON decoding error: {str(e)}"
-        if response and 'body' in response:
-            error_msg += f"\nResponse body (first 500 chars): {response['body'][:500]}"
+    except Exception as e:
+        error_msg = f"Unexpected error parsing response: {str(e)}"
         st.error(error_msg)
+        st.exception(e)
         response_data = None 
     
     try:

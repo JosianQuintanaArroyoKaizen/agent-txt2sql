@@ -266,31 +266,74 @@ def decode_response(response):
 
 def lambda_handler(event, context):
     
-    sessionId = event["sessionId"]
-    question = event["question"]
+    sessionId = event.get("sessionId", "MYSESSION")
+    question = event.get("question", "")
     endSession = False
     
     print(f"Session: {sessionId} asked question: {question}")
     
+    # Validate inputs
+    if not question:
+        return {
+            "status_code": 400,
+            "body": json.dumps({"error": "No question provided"})
+        }
+    
+    # Check if agent ID and alias are configured
+    if agentId == "<YOUR AGENT ID>" or agentAliasId == "<YOUR ALIAS ID>":
+        error_msg = "Agent ID or Alias ID not configured. Please set AGENT_ID and AGENT_ALIAS_ID environment variables."
+        print(f"ERROR: {error_msg}")
+        return {
+            "status_code": 500,
+            "body": json.dumps({"error": error_msg})
+        }
+    
     try:
-        if (event["endSession"] == "true"):
+        if event.get("endSession") == "true" or event.get("endSession") == True:
             endSession = True
     except:
         endSession = False
     
     url = f'https://bedrock-agent-runtime.{theRegion}.amazonaws.com/agents/{agentId}/agentAliases/{agentAliasId}/sessions/{sessionId}/text'
+    print(f"Calling Bedrock agent at: {url}")
 
     
     try: 
         response, trace_data = askQuestion(question, url, endSession)
+        
+        # Ensure response and trace_data are strings
+        if response is None:
+            response = ""
+        if trace_data is None:
+            trace_data = ""
+        
+        # Ensure both are strings
+        if not isinstance(response, str):
+            response = str(response)
+        if not isinstance(trace_data, str):
+            trace_data = str(trace_data)
+        
+        result = {
+            "response": response,
+            "trace_data": trace_data
+        }
+        
+        body_json = json.dumps(result)
+        print(f"Returning response with body length: {len(body_json)}")
+        
         return {
             "status_code": 200,
-            "body": json.dumps({"response": response, "trace_data": trace_data})
+            "body": body_json
         }
     except Exception as e:
+        error_msg = f"Error in lambda_handler: {str(e)}"
+        print(f"ERROR: {error_msg}")
+        import traceback
+        print(traceback.format_exc())
+        
         return {
             "status_code": 500,
-            "body": json.dumps({"error": str(e)})
+            "body": json.dumps({"error": error_msg})
         }
 
 
