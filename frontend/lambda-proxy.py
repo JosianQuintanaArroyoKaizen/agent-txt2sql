@@ -5,6 +5,31 @@ import os
 # Get region from Lambda context or environment
 REGION = os.environ.get('BEDROCK_REGION', os.environ.get('AWS_REGION', 'eu-central-1'))
 bedrock_runtime = boto3.client('bedrock-agent-runtime', region_name=REGION)
+bedrock_agent = boto3.client('bedrock-agent', region_name=REGION)
+
+# Cache for alias ID to avoid repeated API calls
+_alias_cache = {}
+
+def get_alias_id_by_name(agent_id, alias_name):
+    """Get alias ID by name, with caching"""
+    cache_key = f"{agent_id}:{alias_name}"
+    
+    if cache_key in _alias_cache:
+        return _alias_cache[cache_key]
+    
+    try:
+        response = bedrock_agent.list_agent_aliases(agentId=agent_id)
+        for alias in response.get('agentAliasSummaries', []):
+            if alias['agentAliasName'] == alias_name:
+                alias_id = alias['agentAliasId']
+                _alias_cache[cache_key] = alias_id
+                print(f"Resolved alias '{alias_name}' to ID: {alias_id}")
+                return alias_id
+        
+        raise Exception(f"Alias '{alias_name}' not found for agent {agent_id}")
+    except Exception as e:
+        print(f"Error resolving alias: {e}")
+        raise
 
 def lambda_handler(event, context):
     """
@@ -36,11 +61,11 @@ def lambda_handler(event, context):
             body = event.get('body', {})
         
         agent_id = body.get('agentId') or os.environ.get('AGENT_ID')
-        agent_alias_id = body.get('agentAliasId') or os.environ.get('AGENT_ALIAS_ID')
+        agent_alias = body.get('agentAliasId') or os.environ.get('AGENT_ALIAS_NAME', 'txt2sql-dev-eu-central-1-alias')
         session_id = body.get('sessionId', 'web-session')
         question = body.get('question', '')
         
-        print(f"Request: agentId={agent_id}, agentAliasId={agent_alias_id}, question={question[:50] if question else 'None'}")
+        print(f"Request: agentId={agent_id}, agentAlias={agent_alias}, question={question[:50] if question else 'None'}")
         
         if not question:
             return {
@@ -49,12 +74,20 @@ def lambda_handler(event, context):
                 'body': json.dumps({'error': 'Question is required'})
             }
         
-        if not agent_id or not agent_alias_id:
+        if not agent_id:
             return {
                 'statusCode': 400,
                 'headers': headers,
-                'body': json.dumps({'error': 'Agent ID and Alias ID are required'})
+                'body': json.dumps({'error': 'Agent ID is required'})
             }
+        
+        # Resolve alias name to alias ID (check if it's already an ID or needs resolution)
+        if len(agent_alias) == 10 and agent_alias.isupper():
+            # Already an ID (10 uppercase chars)
+            agent_alias_id = agent_alias
+        else:
+            # It's a name, resolve it
+            agent_alias_id = get_alias_id_by_name(agent_id, agent_alias)
         
         # Call Bedrock Agent
         response = bedrock_runtime.invoke_agent(

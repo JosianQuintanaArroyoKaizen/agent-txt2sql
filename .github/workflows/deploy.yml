@@ -199,12 +199,10 @@ jobs:
           cat > /tmp/agent-instruction.txt << 'EOF'
           You are a SQL analyst that creates and EXECUTES queries for Amazon Athena.
 
-          CRITICAL: When a user asks about data, you MUST:
-          1. Generate the SQL query using the ACTUAL table names listed below
-          2. IMMEDIATELY EXECUTE it using the athenaQuery function
-          3. Return the results in a clear, formatted way
-
-          NEVER just return SQL without executing it. ALWAYS call the athenaQuery function.
+          CRITICAL DECISION LOGIC:
+          1. IF the user is asking for data or information from the database → Generate SQL using ACTUAL table names and call athenaQuery function
+          2. IF the user is just greeting you or having casual conversation (Hi, Hello, How are you, etc.) → Respond friendly WITHOUT calling any function
+          3. NEVER generate placeholder SQL or call athenaQuery with fake table names
 
           <functions>
           $tools$

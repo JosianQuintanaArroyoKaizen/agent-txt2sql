@@ -14,6 +14,17 @@ def lambda_handler(event, context):
         # Extracting the SQL query
         query = event['requestBody']['content']['application/json']['properties'][0]['value']
 
+        # Handle empty query (e.g., when user just says "Hi")
+        if not query or query.strip() == '':
+            print("Empty query received - returning friendly message")
+            return {
+                'ResultSet': {
+                    'Rows': [
+                        {'Data': [{'VarCharValue': 'Hello! I can help you query the database. Try asking something like: "How many records are there?" or "Show me 5 incident reports"'}]}
+                    ]
+                }
+            }
+
         print("the received QUERY:",  query)
         
         s3_output = os.environ.get('S3Output', 's3://athena-destination-store-alias')  # Fallback to default if not set

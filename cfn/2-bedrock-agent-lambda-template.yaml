@@ -4,8 +4,8 @@ Description: CloudFormation template to create an AWS Bedrock Agent resource and
 Parameters:
   FoundationModel:
     Type: String
-    Default: 'eu.anthropic.claude-3-haiku-20240307-v1:0'
-    Description: 'Foundation model ID. Use eu. prefix for GDPR compliance in EU regions'
+    Default: 'anthropic.claude-3-7-sonnet-20250219-v1:0'
+    Description: 'Foundation model ID. Claude 3.7 Sonnet provides better reasoning and instruction following'
   Alias:
     Type: String
     Default: '{ENTER ALIAS}'
@@ -105,6 +105,18 @@ Resources:
                   try:
                       # Extracting the SQL query
                       query = event['requestBody']['content']['application/json']['properties'][0]['value']
+                      
+                      # Handle empty query (e.g., when user just says "Hi")
+                      if not query or query.strip() == '':
+                          logger.info("Empty query received - returning friendly message")
+                          return {
+                              'ResultSet': {
+                                  'Rows': [
+                                      {'Data': [{'VarCharValue': 'Hello! I can help you query the database. Try asking something like: "How many records are there?" or "Show me 5 incident reports"'}]}
+                                  ]
+                              }
+                          }
+                      
                       logger.info(f"Executing query: {query}")
 
                       s3_output = os.environ.get('S3Output')
@@ -232,15 +244,15 @@ Resources:
                 "openapi": "3.0.1",
                 "info": {
                   "title": "AthenaQuery API",
-                  "description": "API for querying data from an Athena database",
+                  "description": "API for querying txt2sql_dev_athena_db database. Available tables: test_population (7867 EMIR financial records), txt2sql_dev_customers, txt2sql_dev_procedures. ALWAYS use these exact table names.",
                   "version": "1.0.0"
                 },
                 "paths": {
                   "/athenaQuery": {
                     "post": {
-                      "description": "Execute a query on an Athena database",
+                      "description": "Execute a SQL query on the Athena database. Use real table names: test_population, txt2sql_dev_customers, txt2sql_dev_procedures. NEVER use placeholder names like 'your_table_name' or 'table_name'.",
                       "requestBody": {
-                        "description": "Athena query details",
+                        "description": "SQL query to execute on txt2sql_dev_athena_db database",
                         "required": true,
                         "content": {
                           "application/json": {
@@ -249,7 +261,7 @@ Resources:
                               "properties": {
                                 "Query": {
                                   "type": "string",
-                                  "description": "SQL Query"
+                                  "description": "SQL query using real table names (test_population, txt2sql_dev_customers, txt2sql_dev_procedures). Example: SELECT COUNT(*) FROM test_population"
                                 }
                               }
                             }
