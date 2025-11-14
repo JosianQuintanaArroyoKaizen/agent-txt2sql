@@ -40,6 +40,8 @@ def lambda_handler(event, context):
         session_id = body.get('sessionId', 'web-session')
         question = body.get('question', '')
         
+        print(f"Request: agentId={agent_id}, agentAliasId={agent_alias_id}, question={question[:50] if question else 'None'}")
+        
         if not question:
             return {
                 'statusCode': 400,

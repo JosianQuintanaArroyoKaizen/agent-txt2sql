@@ -85,6 +85,7 @@ Resources:
       Environment:
         Variables:
           S3Output: !Sub "s3://sl-athena-output-${Alias}-${AWS::AccountId}-${AWS::Region}/"
+          DatabaseName: !Sub "${AliasDb}_${AthenaDatabaseName}"
       Code:
         ZipFile: |
           import boto3
@@ -122,10 +123,18 @@ Resources:
 
               def execute_athena_query(query, s3_output):
                   try:
-                      response = athena_client.start_query_execution(
-                          QueryString=query,
-                          ResultConfiguration={'OutputLocation': s3_output}
-                      )
+                      database_name = os.environ.get('DatabaseName')
+                      query_execution_params = {
+                          'QueryString': query,
+                          'ResultConfiguration': {'OutputLocation': s3_output}
+                      }
+                      
+                      # Add QueryExecutionContext if database name is set
+                      if database_name:
+                          query_execution_params['QueryExecutionContext'] = {'Database': database_name}
+                          logger.info(f"Using database: {database_name}")
+                      
+                      response = athena_client.start_query_execution(**query_execution_params)
                       return response['QueryExecutionId']
                   except Exception as e:
                       logger.error(f"Failed to start query execution: {str(e)}")
