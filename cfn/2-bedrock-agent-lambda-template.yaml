@@ -225,6 +225,9 @@ Outputs:
   BedrockAgentName:
     Description: 'Name of the Bedrock Agent created'
     Value: !Ref BedrockAgent
+  AgentId:
+    Description: 'ID of the Bedrock Agent'
+    Value: !Ref BedrockAgent
   AthenaQueryLambdaArn:
     Description: 'ARN of the Athena Query Lambda function'
     Value: !GetAtt AthenaQueryLambda.Arn
