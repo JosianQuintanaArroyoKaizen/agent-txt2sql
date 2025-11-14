@@ -1,7 +1,7 @@
 // Configuration
 let config = {
-    agentId: 'G1RWZFEZ4O',
-    agentAliasId: 'TSTALIASID',
+    agentId: 'ESWNHWEQXL',
+    agentAliasId: 'REJ45MYX4A',
     awsRegion: 'eu-central-1',
     sessionId: 'web-session-' + Date.now()
 };
