@@ -33,15 +33,6 @@ Resources:
         - arn:aws:iam::aws:policy/AmazonAthenaFullAccess
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
         - !Ref CloudWatchLogsPolicy
-      Policies:
-        - PolicyName: 'SQSSendMessagePolicy'
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - 'sqs:SendMessage'
-                Resource: !GetAtt AthenaQueryLambdaDLQ.Arn
 
   CloudWatchLogsPolicy:
     Type: 'AWS::IAM::ManagedPolicy'
@@ -81,11 +72,6 @@ Resources:
               - 'lambda:InvokeFunction'
             Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:AthenaQueryLambda-${Alias}-${AWS::Region}-${AWS::AccountId}'
 
-  AthenaQueryLambdaDLQ:
-    Type: 'AWS::SQS::Queue'
-    Properties:
-      QueueName: !Sub "AthenaQueryLambdaDLQ-${Alias}-${AWS::AccountId}-${AWS::Region}"
-
   AthenaQueryLambda:
     Type: 'AWS::Lambda::Function'
     Properties:
@@ -96,8 +82,6 @@ Resources:
       MemorySize: 1024
       Timeout: 120
       #ReservedConcurrentExecutions: 2  # Set to your desired number
-      DeadLetterConfig:
-        TargetArn: !GetAtt AthenaQueryLambdaDLQ.Arn
       Environment:
         Variables:
           S3Output: !Sub "s3://sl-athena-output-${Alias}-${AWS::AccountId}-${AWS::Region}/"
