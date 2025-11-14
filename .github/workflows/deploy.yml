@@ -183,10 +183,10 @@ jobs:
             --query 'Stacks[0].Outputs[?OutputKey==`AgentId`].OutputValue' \
             --output text)
           
-          AGENT_ALIAS_ID=$(aws bedrock-agent list-agent-aliases \
-            --agent-id "${AGENT_ID}" \
+          AGENT_ALIAS_ID=$(aws cloudformation describe-stacks \
+            --stack-name "${STACK_SUFFIX}-bedrock-agent-lambda-stack" \
             --region ${{ env.AWS_REGION }} \
-            --query 'agentAliasSummaries[?contains(routingConfiguration[0].agentVersion, `DRAFT`)].agentAliasId' \
+            --query 'Stacks[0].Outputs[?OutputKey==`AgentAliasId`].OutputValue' \
             --output text)
           
           echo "agent_id=$AGENT_ID" >> $GITHUB_OUTPUT
