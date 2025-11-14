@@ -317,3 +317,4 @@ jobs:
           echo "### Production Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "✅ All stacks deployed successfully" >> $GITHUB_STEP_SUMMARY
 
+# Agent deleted manually, triggering fresh deployment
