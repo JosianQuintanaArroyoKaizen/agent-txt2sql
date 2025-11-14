@@ -263,7 +263,7 @@ aws apigateway put-method-response \
     --http-method OPTIONS \
     --status-code 200 \
     --response-parameters "method.response.header.Access-Control-Allow-Origin=true,method.response.header.Access-Control-Allow-Headers=true,method.response.header.Access-Control-Allow-Methods=true" \
-    --region $REGION >/dev/null 2>&1
+    --region $REGION >/dev/null 2>&1 || echo "Method response already configured"
 
 aws apigateway put-integration-response \
     --rest-api-id $API_ID \
@@ -271,7 +271,7 @@ aws apigateway put-integration-response \
     --http-method OPTIONS \
     --status-code 200 \
     --response-parameters "{\"method.response.header.Access-Control-Allow-Origin\":\"'*'\",\"method.response.header.Access-Control-Allow-Headers\":\"'Content-Type'\",\"method.response.header.Access-Control-Allow-Methods\":\"'POST,OPTIONS'\"}" \
-    --region $REGION >/dev/null 2>&1
+    --region $REGION >/dev/null 2>&1 || echo "Integration response already configured"
 
 # Grant API Gateway permission to invoke Lambda
 aws lambda add-permission \
