@@ -1,0 +1,244 @@
+name: Deploy Streamlit to AWS App Runner
+
+on:
+  push:
+    branches:
+      - main
+      - dev  # Also trigger on dev branch
+    paths:
+      - 'streamlit_app/**'
+      - '.github/workflows/deploy-apprunner.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REPOSITORY: txt2sql-streamlit-dev
+  SERVICE_NAME: txt2sql-streamlit-dev
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build, tag, and push image to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        cd streamlit_app
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+    - name: Create or Update App Runner Service
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: latest
+        AGENT_ID: ${{ secrets.AGENT_ID }}
+        AGENT_ALIAS_ID: ${{ secrets.AGENT_ALIAS_ID }}
+      run: |
+        # Check if service exists
+        SERVICE_ARN=$(aws apprunner list-services \
+          --region ${{ env.AWS_REGION }} \
+          --query "ServiceSummaryList[?ServiceName=='${{ env.SERVICE_NAME }}'].ServiceArn" \
+          --output text || echo "")
+        
+        if [ -z "$SERVICE_ARN" ]; then
+          echo "Creating new App Runner service..."
+          # Get or create App Runner access role
+          ACCESS_ROLE_ARN=$(aws iam get-role --role-name AppRunnerECRAccessRole --query 'Role.Arn' --output text 2>/dev/null || echo "")
+          
+          if [ -z "$ACCESS_ROLE_ARN" ]; then
+            echo "Creating App Runner ECR access role..."
+            # Create trust policy for App Runner using echo to avoid YAML heredoc issues
+            echo '{
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": {
+                    "Service": "build.apprunner.amazonaws.com"
+                  },
+                  "Action": "sts:AssumeRole"
+                }
+              ]
+            }' > /tmp/apprunner-trust-policy.json
+            
+            # Create the role
+            ACCESS_ROLE_ARN=$(aws iam create-role \
+              --role-name AppRunnerECRAccessRole \
+              --assume-role-policy-document file:///tmp/apprunner-trust-policy.json \
+              --query 'Role.Arn' \
+              --output text)
+            
+            # Attach ECR read policy
+            aws iam attach-role-policy \
+              --role-name AppRunnerECRAccessRole \
+              --policy-arn arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
+            
+            echo "Waiting for role to propagate..."
+            sleep 5
+          fi
+          
+          aws apprunner create-service \
+            --service-name ${{ env.SERVICE_NAME }} \
+            --source-configuration "{
+              \"ImageRepository\": {
+                \"ImageIdentifier\": \"$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",
+                \"ImageRepositoryType\": \"ECR\",
+                \"ImageConfiguration\": {
+                  \"Port\": \"8501\",
+                  \"RuntimeEnvironmentVariables\": {
+                    \"AWS_REGION\": \"${{ env.AWS_REGION }}\",
+                    \"AGENT_ID\": \"$AGENT_ID\",
+                    \"AGENT_ALIAS_ID\": \"$AGENT_ALIAS_ID\"
+                  }
+                }
+              },
+              \"AutoDeploymentsEnabled\": true,
+              \"AuthenticationConfiguration\": {
+                \"AccessRoleArn\": \"$ACCESS_ROLE_ARN\"
+              }
+            }" \
+            --instance-configuration '{
+              "Cpu": "0.25 vCPU",
+              "Memory": "0.5 GB"
+            }' \
+            --region ${{ env.AWS_REGION }}
+        else
+          echo "Updating existing App Runner service..."
+          # Wait for service to be in a ready state and no operations in progress before updating
+          echo "Checking service status and operations..."
+          MAX_WAIT=600  # 10 minutes max wait
+          WAIT_INTERVAL=30  # Check every 30 seconds
+          ELAPSED=0
+          
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            STATUS=$(aws apprunner describe-service \
+              --service-arn "$SERVICE_ARN" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'Service.Status' \
+              --output text)
+            
+            # Check for operations in progress
+            OPERATION_STATUS=$(aws apprunner list-operations \
+              --service-arn "$SERVICE_ARN" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'OperationSummaryList[0].Status' \
+              --output text 2>/dev/null || echo "NONE")
+            
+            echo "Current service status: $STATUS"
+            echo "Current operation status: $OPERATION_STATUS"
+            
+            # Service must be RUNNING or PAUSED, and no operations should be in progress
+            if [ "$STATUS" = "RUNNING" ] || [ "$STATUS" = "PAUSED" ]; then
+              if [ "$OPERATION_STATUS" = "SUCCEEDED" ] || [ "$OPERATION_STATUS" = "FAILED" ] || [ "$OPERATION_STATUS" = "NONE" ] || [ -z "$OPERATION_STATUS" ]; then
+                echo "Service is ready for update (status: $STATUS, operation: $OPERATION_STATUS)"
+                break
+              else
+                echo "Service is $STATUS but operation is in progress ($OPERATION_STATUS), waiting..."
+              fi
+            elif [ "$STATUS" = "CREATE_FAILED" ] || [ "$STATUS" = "UPDATE_FAILED" ] || [ "$STATUS" = "DELETE_FAILED" ]; then
+              echo "Service is in failed state, attempting update anyway..."
+              break
+            else
+              echo "Service is still in $STATUS state, waiting $WAIT_INTERVAL seconds..."
+            fi
+            
+            sleep $WAIT_INTERVAL
+            ELAPSED=$((ELAPSED + WAIT_INTERVAL))
+          done
+          
+          if [ $ELAPSED -ge $MAX_WAIT ]; then
+            echo "Warning: Service did not become ready within $MAX_WAIT seconds, attempting update anyway..."
+          fi
+          
+          # Get access role for update (should already exist)
+          ACCESS_ROLE_ARN=$(aws iam get-role --role-name AppRunnerECRAccessRole --query 'Role.Arn' --output text 2>/dev/null || echo "")
+          
+          # Retry update-service with exponential backoff if it fails due to operation in progress
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          RETRY_DELAY=10
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Attempting to update service (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
+            
+            UPDATE_OUTPUT=$(aws apprunner update-service \
+              --service-arn "$SERVICE_ARN" \
+              --source-configuration "{
+                \"ImageRepository\": {
+                  \"ImageIdentifier\": \"$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",
+                  \"ImageRepositoryType\": \"ECR\",
+                  \"ImageConfiguration\": {
+                    \"Port\": \"8501\",
+                    \"RuntimeEnvironmentVariables\": {
+                      \"AWS_REGION\": \"${{ env.AWS_REGION }}\",
+                      \"AGENT_ID\": \"$AGENT_ID\",
+                      \"AGENT_ALIAS_ID\": \"$AGENT_ALIAS_ID\"
+                    }
+                  }
+                },
+                \"AutoDeploymentsEnabled\": true,
+                \"AuthenticationConfiguration\": {
+                  \"AccessRoleArn\": \"$ACCESS_ROLE_ARN\"
+                }
+              }" \
+              --region ${{ env.AWS_REGION }} 2>&1)
+            
+            UPDATE_EXIT_CODE=$?
+            
+            if [ $UPDATE_EXIT_CODE -eq 0 ]; then
+              echo "✓ Service update initiated successfully"
+              break
+            elif echo "$UPDATE_OUTPUT" | grep -q "InvalidStateException\|OPERATION_IN_PROGRESS"; then
+              if [ $RETRY_COUNT -lt $((MAX_RETRIES - 1)) ]; then
+                echo "Service has operation in progress, waiting $RETRY_DELAY seconds before retry..."
+                sleep $RETRY_DELAY
+                RETRY_DELAY=$((RETRY_DELAY * 2))  # Exponential backoff
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+              else
+                echo "✗ Failed to update service after $MAX_RETRIES attempts - operation still in progress"
+                echo "Error: $UPDATE_OUTPUT"
+                exit 1
+              fi
+            else
+              echo "✗ Update failed with error: $UPDATE_OUTPUT"
+              exit 1
+            fi
+          done
+        fi
+
+    - name: Get Service URL
+      id: get-url
+      run: |
+        SERVICE_ARN=$(aws apprunner list-services \
+          --region ${{ env.AWS_REGION }} \
+          --query "ServiceSummaryList[?ServiceName=='${{ env.SERVICE_NAME }}'].ServiceArn" \
+          --output text)
+        
+        SERVICE_URL=$(aws apprunner describe-service \
+          --service-arn "$SERVICE_ARN" \
+          --region ${{ env.AWS_REGION }} \
+          --query 'Service.ServiceUrl' \
+          --output text)
+        
+        echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+        echo "🚀 Your app is available at: $SERVICE_URL"
+

@@ -1,5 +1,6 @@
 import boto3
 from time import sleep
+import os
 
 # Initialize the Athena client
 athena_client = boto3.client('athena')
@@ -13,21 +14,40 @@ def lambda_handler(event, context):
         # Extracting the SQL query
         query = event['requestBody']['content']['application/json']['properties'][0]['value']
 
+        # Handle empty query (e.g., when user just says "Hi")
+        if not query or query.strip() == '':
+            print("Empty query received - returning friendly message")
+            return {
+                'ResultSet': {
+                    'Rows': [
+                        {'Data': [{'VarCharValue': 'Hello! I can help you query the database. Try asking something like: "How many records are there?" or "Show me 5 incident reports"'}]}
+                    ]
+                }
+            }
+
         print("the received QUERY:",  query)
         
-        s3_output = 's3://athena-destination-store-alias'  # Replace with your S3 bucket
+        s3_output = os.environ.get('S3Output', 's3://athena-destination-store-alias')  # Fallback to default if not set
+        database_name = os.environ.get('DatabaseName')  # Get database name from environment
 
         # Execute the query and wait for completion
-        execution_id = execute_athena_query(query, s3_output)
+        execution_id = execute_athena_query(query, s3_output, database_name)
         result = get_query_results(execution_id)
 
         return result
 
-    def execute_athena_query(query, s3_output):
-        response = athena_client.start_query_execution(
-            QueryString=query,
-            ResultConfiguration={'OutputLocation': s3_output}
-        )
+    def execute_athena_query(query, s3_output, database_name=None):
+        query_execution_params = {
+            'QueryString': query,
+            'ResultConfiguration': {'OutputLocation': s3_output}
+        }
+        
+        # Add QueryExecutionContext if database name is set
+        if database_name:
+            query_execution_params['QueryExecutionContext'] = {'Database': database_name}
+            print(f"Using database: {database_name}")
+        
+        response = athena_client.start_query_execution(**query_execution_params)
         return response['QueryExecutionId']
 
     def check_query_status(execution_id):

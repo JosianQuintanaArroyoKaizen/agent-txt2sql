@@ -196,6 +196,8 @@ aws logs tail /aws/lambda/AthenaQueryLambda-<ACCOUNT-ID> \
 2. Upload to S3 bucket
 3. Update Athena table definitions
 4. Update agent prompt with new schema
+5. Want an easier path? Drop CSVs into `data/uploads/` and run
+   `./scripts/ingest_uploads.py` (after configuring `config/ingestion-config.json`).
 
 ### Change Model
 

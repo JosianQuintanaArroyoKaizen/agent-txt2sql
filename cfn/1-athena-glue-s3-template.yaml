@@ -10,6 +10,10 @@ Parameters:
     Type: String
     Default: '{ENTER ALIAS}'
     Description: Alias is used for naming conventions for resources.
+  AliasDb:
+    Type: String
+    Default: '{ENTER ALIAS DB}'
+    Description: Sanitized alias (underscores only) used for Athena database names.
 
 Resources:
   ReplicationRole:
@@ -121,7 +125,7 @@ Resources:
     Properties:
       CatalogId: !Ref 'AWS::AccountId'
       DatabaseInput:
-        Name: !Sub '${Alias}_${AthenaDatabaseName}'
+        Name: !Sub '${AliasDb}_${AthenaDatabaseName}'
 
   GlueServiceRole:
     Type: 'AWS::IAM::Role'
@@ -268,8 +272,8 @@ Resources:
     Type: 'AWS::Glue::Crawler'
     DependsOn: CopyDataCustomResource
     Properties:
-      DatabaseName: !Sub '${Alias}_${AthenaDatabaseName}'
-      Name: !Sub "${Alias}_${AthenaDatabaseName}-crawler-customers"
+      DatabaseName: !Sub '${AliasDb}_${AthenaDatabaseName}'
+      Name: !Sub "${AliasDb}_${AthenaDatabaseName}-crawler-customers"
       Role: !GetAtt GlueServiceRole.Arn
       Targets:
         S3Targets:
@@ -280,8 +284,8 @@ Resources:
     Type: 'AWS::Glue::Crawler'
     DependsOn: CopyDataCustomResource
     Properties:
-      DatabaseName: !Sub '${Alias}_${AthenaDatabaseName}'
-      Name: !Sub "${Alias}_${AthenaDatabaseName}-crawler-procedures"
+      DatabaseName: !Sub '${AliasDb}_${AthenaDatabaseName}'
+      Name: !Sub "${AliasDb}_${AthenaDatabaseName}-crawler-procedures"
       Role: !GetAtt GlueServiceRole.Arn
       Targets:
         S3Targets:
@@ -293,9 +297,9 @@ Resources:
     DependsOn: GlueCrawlerCustomers
     Properties: 
       CatalogId: !Ref 'AWS::AccountId'
-      DatabaseName: !Sub '${Alias}_${AthenaDatabaseName}'
+      DatabaseName: !Sub '${AliasDb}_${AthenaDatabaseName}'
       TableInput: 
-        Name: !Sub '${Alias}_customers'
+        Name: !Sub '${AliasDb}_customers'
         Description: 'Customers table'
         StorageDescriptor: 
           Columns: 
@@ -327,9 +331,9 @@ Resources:
     DependsOn: GlueCrawlerProcedures
     Properties: 
       CatalogId: !Ref 'AWS::AccountId'
-      DatabaseName: !Sub '${Alias}_${AthenaDatabaseName}'
+      DatabaseName: !Sub '${AliasDb}_${AthenaDatabaseName}'
       TableInput: 
-        Name: !Sub '${Alias}_procedures'
+        Name: !Sub '${AliasDb}_procedures'
         Description: 'Procedures table'
         StorageDescriptor: 
           Columns: 
@@ -363,7 +367,7 @@ Resources:
 Outputs:
   AthenaDatabaseName:
     Description: 'Name of the Athena database created'
-    Value: !Sub '${Alias}_${AthenaDatabaseName}'
+    Value: !Sub '${AliasDb}_${AthenaDatabaseName}'
 
   S3BucketName:
     Description: 'Name of the S3 bucket created'

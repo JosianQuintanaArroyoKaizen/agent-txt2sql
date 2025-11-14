@@ -1,0 +1,216 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EC2 with Elastic IP for Streamlit - Simple, Works with Single Subnet'
+
+Parameters:
+  Alias:
+    Type: String
+    Default: txt2sql-dev
+    Description: Environment alias
+  
+  AgentId:
+    Type: String
+    Description: Bedrock Agent ID
+    NoEcho: false
+  
+  AgentAliasId:
+    Type: String
+    Description: Bedrock Agent Alias ID
+    NoEcho: false
+  
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID
+  
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet ID (only one needed)
+  
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues:
+      - t3.small
+      - t3.medium
+      - t3.large
+
+Resources:
+  # Security Group for EC2
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for EC2 Streamlit app
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8501
+          ToPort: 8501
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${Alias}-ec2-sg'
+  
+  # Elastic IP
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${Alias}-streamlit-eip'
+  
+  # IAM Role for EC2
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+  
+  # Instance Profile
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2Role
+  
+  # EC2 Instance
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Sub "{{resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id}}"
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      SubnetId: !Ref SubnetId
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+          
+          # Update system
+          apt-get update -y
+          apt-get upgrade -y
+          apt-get install -y python3-pip git curl
+          
+          # Install Streamlit and dependencies
+          pip3 install streamlit boto3 requests pandas pillow
+          
+          # Create app directory
+          mkdir -p /home/ubuntu/app/streamlit_app
+          cd /home/ubuntu/app/streamlit_app
+          
+          # Create minimal app files
+          cat > app.py << 'APPEOF'
+          import streamlit as st
+          import os
+          from invoke_agent import invoke_agent
+          
+          st.set_page_config(page_title="Text2SQL Agent", layout="wide")
+          st.title("Text2SQL Agent - Amazon Athena")
+          
+          prompt = st.text_input("Please enter your query?", max_chars=2000)
+          submit_button = st.button("Submit", type="primary")
+          
+          if submit_button and prompt:
+              with st.spinner("Processing..."):
+                  try:
+                      response = invoke_agent(prompt)
+                      st.success("Query executed successfully!")
+                      st.json(response)
+                  except Exception as e:
+                      st.error(f"Error: {str(e)}")
+          APPEOF
+          
+          cat > invoke_agent.py << 'INVOKEEOF'
+          import os
+          import boto3
+          import json
+          
+          def invoke_agent(prompt):
+              bedrock_agent = boto3.client('bedrock-agent-runtime', region_name=os.environ.get('AWS_REGION', 'eu-central-1'))
+              agent_id = os.environ.get('AGENT_ID')
+              alias_id = os.environ.get('AGENT_ALIAS_ID')
+              
+              response = bedrock_agent.invoke_agent(
+                  agentId=agent_id,
+                  agentAliasId=alias_id,
+                  sessionId='default',
+                  inputText=prompt
+              )
+              
+              result = ""
+              for event in response['completion']:
+                  if 'chunk' in event:
+                      result += event['chunk']['bytes'].decode('utf-8')
+              
+              return json.loads(result) if result else {"message": "No response"}
+          INVOKEEOF
+          
+          # Create systemd service
+          cat > /etc/systemd/system/streamlit-txt2sql.service << 'EOF'
+          [Unit]
+          Description=Streamlit Text2SQL Agent App
+          After=network.target
+          
+          [Service]
+          Type=simple
+          User=ubuntu
+          WorkingDirectory=/home/ubuntu/app/streamlit_app
+          Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+          Environment="AWS_REGION=${AWS::Region}"
+          Environment="AGENT_ID=${AgentId}"
+          Environment="AGENT_ALIAS_ID=${AgentAliasId}"
+          ExecStart=/usr/local/bin/streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true
+          Restart=always
+          RestartSec=10
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          
+          # Enable and start service
+          systemctl daemon-reload
+          systemctl enable streamlit-txt2sql
+          sleep 10
+          systemctl start streamlit-txt2sql
+      Tags:
+        - Key: Name
+          Value: !Sub '${Alias}-streamlit-ec2'
+  
+  # Associate Elastic IP with Instance
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref EC2Instance
+      EIP: !Ref ElasticIP
+
+Outputs:
+  StreamlitURL:
+    Description: Permanent URL to access the Streamlit app
+    Value: !Sub 'http://${ElasticIP.PublicIp}:8501'
+    Export:
+      Name: !Sub '${Alias}-StreamlitURL'
+  
+  ElasticIP:
+    Description: Elastic IP address (permanent)
+    Value: !Ref ElasticIP
+    Export:
+      Name: !Sub '${Alias}-StreamlitEIP'
+  
+  InstanceId:
+    Description: EC2 Instance ID
+    Value: !Ref EC2Instance
+

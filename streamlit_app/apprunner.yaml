@@ -1,0 +1,20 @@
+version: 1.0
+runtime: docker
+build:
+  commands:
+    build:
+      - echo "No build commands needed for Docker"
+run:
+  runtime-version: latest
+  command: streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true
+  network:
+    port: 8501
+    env: PORT
+  env:
+    - name: AWS_REGION
+      value: eu-central-1
+    - name: AGENT_ID
+      value: ""  # Will be set via environment variables or AWS Secrets Manager
+    - name: AGENT_ALIAS_ID
+      value: ""  # Will be set via environment variables or AWS Secrets Manager
+

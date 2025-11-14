@@ -1,0 +1,13 @@
+{
+  "bucket": "sl-data-store-txt2sql-dev-194561596031-eu-central-1",
+  "athena_output": "s3://sl-athena-output-txt2sql-dev-194561596031-eu-central-1/",
+  "database": "txt2sql_dev_athena_db",
+  "prefix": "custom",
+  "region": "eu-central-1",
+  "create_view": true,
+  "view_suffix": "view",
+  "delimiter": ",",
+  "quote_char": "\"",
+  "column_map_dir": "schema/column-maps",
+  "table_name_prefix": ""
+}
