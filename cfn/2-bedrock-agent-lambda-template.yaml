@@ -213,6 +213,65 @@ Resources:
         You are a SQL analyst that creates and executes queries for Amazon Athena.
         When a user asks about data, generate the SQL query and execute it using the athenaQuery function.
         Return both the query and the results.
+      ActionGroups:
+        - ActionGroupName: query-athena
+          ActionGroupExecutor:
+            Lambda: !GetAtt AthenaQueryLambda.Arn
+          ApiSchema:
+            Payload: |
+              {
+                "openapi": "3.0.1",
+                "info": {
+                  "title": "AthenaQuery API",
+                  "description": "API for querying data from an Athena database",
+                  "version": "1.0.0"
+                },
+                "paths": {
+                  "/athenaQuery": {
+                    "post": {
+                      "description": "Execute a query on an Athena database",
+                      "requestBody": {
+                        "description": "Athena query details",
+                        "required": true,
+                        "content": {
+                          "application/json": {
+                            "schema": {
+                              "type": "object",
+                              "properties": {
+                                "Query": {
+                                  "type": "string",
+                                  "description": "SQL Query"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "responses": {
+                        "200": {
+                          "description": "Successful response with query results",
+                          "content": {
+                            "application/json": {
+                              "schema": {
+                                "type": "object",
+                                "properties": {
+                                  "ResultSet": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "description": "A single row of query results"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
 
   BedrockAgentAlias:
     Type: 'AWS::Bedrock::AgentAlias'
