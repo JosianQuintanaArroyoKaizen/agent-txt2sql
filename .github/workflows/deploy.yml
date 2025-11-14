@@ -67,6 +67,30 @@ jobs:
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
 
+      - name: Check and Clean Stack 1 if Failed
+        run: |
+          STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
+          STACK_NAME="${STACK_SUFFIX}-athena-glue-s3-stack"
+          
+          STACK_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>&1 || echo "DOES_NOT_EXIST")
+          
+          echo "Stack 1 status: $STACK_STATUS"
+          
+          if [[ "$STACK_STATUS" =~ (ROLLBACK_COMPLETE|UPDATE_ROLLBACK_COMPLETE|CREATE_FAILED|UPDATE_FAILED) ]]; then
+            echo "⚠️ Stack 1 is in failed state. Deleting..."
+            aws cloudformation delete-stack \
+              --stack-name "$STACK_NAME" \
+              --region ${{ env.AWS_REGION }}
+            aws cloudformation wait stack-delete-complete \
+              --stack-name "$STACK_NAME" \
+              --region ${{ env.AWS_REGION }} || true
+            echo "✅ Stack 1 deleted."
+          fi
+
       - name: Deploy Stack 1 - Athena, Glue, S3
         run: |
           STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
@@ -92,6 +116,35 @@ jobs:
           aws cloudformation wait stack-update-complete \
             --stack-name "${STACK_SUFFIX}-athena-glue-s3-stack" \
             --region ${{ env.AWS_REGION }} || true
+
+      - name: Check and Clean Stack 2 if Failed
+        run: |
+          STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
+          STACK_NAME="${STACK_SUFFIX}-bedrock-agent-lambda-stack"
+          
+          # Check if stack exists and its status
+          STACK_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>&1 || echo "DOES_NOT_EXIST")
+          
+          echo "Current stack status: $STACK_STATUS"
+          
+          # If stack is in a failed state, delete it
+          if [[ "$STACK_STATUS" =~ (ROLLBACK_COMPLETE|UPDATE_ROLLBACK_COMPLETE|CREATE_FAILED|UPDATE_FAILED) ]]; then
+            echo "⚠️ Stack is in failed state ($STACK_STATUS). Deleting..."
+            aws cloudformation delete-stack \
+              --stack-name "$STACK_NAME" \
+              --region ${{ env.AWS_REGION }}
+            
+            echo "Waiting for stack deletion..."
+            aws cloudformation wait stack-delete-complete \
+              --stack-name "$STACK_NAME" \
+              --region ${{ env.AWS_REGION }} || true
+            
+            echo "✅ Stack deleted. Will create fresh."
+          fi
 
       - name: Deploy Stack 2 - Bedrock Agent and Lambda
         run: |
