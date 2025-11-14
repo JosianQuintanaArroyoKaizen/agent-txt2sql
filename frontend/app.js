@@ -1,8 +1,8 @@
-// Configuration - DEV Environment
+// Configuration - Can be overridden by config.js or localStorage
 let config = {
-    agentId: 'PBVMU8ET2X',
-    agentAliasId: 'DLK6WUSZ2Z',
-    awsRegion: 'eu-central-1',
+    agentId: window.AGENT_CONFIG?.agentId || 'PBVMU8ET2X',
+    agentAliasId: window.AGENT_CONFIG?.agentAliasId || 'DLK6WUSZ2Z',
+    awsRegion: window.AGENT_CONFIG?.awsRegion || 'eu-central-1',
     sessionId: 'web-session-' + Date.now()
 };
 

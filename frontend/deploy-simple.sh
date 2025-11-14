@@ -304,8 +304,21 @@ if ! aws s3 ls "s3://$BUCKET_NAME" >/dev/null 2>&1; then
     echo -e "${GREEN}✅ Bucket created${NC}"
 fi
 
+# Generate dynamic config before uploading
+echo -e "${YELLOW}Generating dynamic config from CloudFormation...${NC}"
+if [ -f "./generate-config.sh" ]; then
+    # Extract environment from AGENT_ID naming pattern or use 'dev' as default
+    ENV="dev"
+    ./generate-config.sh "$ENV" "$REGION" || echo -e "${YELLOW}⚠️  Config generation skipped${NC}"
+fi
+
 aws s3 cp index.html s3://$BUCKET_NAME/ --region $REGION
 aws s3 cp app.js s3://$BUCKET_NAME/ --region $REGION
+# Upload config.js if it exists
+if [ -f "config.js" ]; then
+    aws s3 cp config.js s3://$BUCKET_NAME/ --region $REGION
+    echo -e "${GREEN}✅ Dynamic config uploaded${NC}"
+fi
 
 aws s3 website s3://$BUCKET_NAME \
     --index-document index.html \

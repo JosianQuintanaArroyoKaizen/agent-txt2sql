@@ -7,9 +7,28 @@ A minimal, functional frontend for the Bedrock Text2SQL Agent. No WebSockets, no
 - ✅ Simple, clean interface
 - ✅ Conversation history (stored in browser)
 - ✅ Direct Bedrock Agent API calls
-- ✅ Configurable Agent ID and Alias ID
+- ✅ **Dynamic agent configuration** - Auto-updates from CloudFormation
+- ✅ Configurable Agent ID and Alias ID (with UI override)
 - ✅ Works with AWS Amplify or S3 + CloudFront
 - ✅ Stable URL (doesn't change)
+
+## Dynamic Configuration
+
+The frontend automatically loads agent configuration from CloudFormation:
+
+### Generate Config
+
+```bash
+# Generate config for dev environment
+./generate-config.sh dev eu-central-1
+
+# Generate config for prod environment
+./generate-config.sh prod eu-central-1
+```
+
+This creates `config.js` with the current agent ID and alias from your CloudFormation stack. The file is auto-generated and should not be edited manually.
+
+**Note:** `config.js` is in `.gitignore` and generated during deployment.
 
 ## Deployment Options
 

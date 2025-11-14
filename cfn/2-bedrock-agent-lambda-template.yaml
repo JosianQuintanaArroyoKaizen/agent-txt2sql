@@ -4,8 +4,8 @@ Description: CloudFormation template to create an AWS Bedrock Agent resource and
 Parameters:
   FoundationModel:
     Type: String
-    Default: 'anthropic.claude-3-haiku-20240307-v1:0'
-    Description: 'Foundation model ID. Using Claude 3 Haiku (Claude 3.7 Sonnet has tool name validation issues)'
+    Default: 'anthropic.claude-3-5-sonnet-20240620-v1:0'
+    Description: 'Foundation model ID. Using Claude 3.5 Sonnet for better SQL generation and reasoning'
   Alias:
     Type: String
     Default: '{ENTER ALIAS}'
@@ -265,6 +265,7 @@ Resources:
                 "paths": {
                   "/athenaQuery": {
                     "post": {
+                      "operationId": "POST_athenaQuery",
                       "description": "Execute a SQL query on the Athena database. Use real table names: test_population, txt2sql_dev_customers, txt2sql_dev_procedures. NEVER use placeholder names like 'your_table_name' or 'table_name'.",
                       "requestBody": {
                         "description": "SQL query to execute on txt2sql_dev_athena_db database",
