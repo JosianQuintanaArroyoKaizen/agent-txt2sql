@@ -1,23 +1,27 @@
 # GitHub Actions CI/CD Pipeline for Bedrock Text2SQL Agent
-# This workflow deploys the CloudFormation stacks on push to main branch
+# Auto-deploys on push to dev, manual trigger only for production (main)
 
 name: Deploy Bedrock Text2SQL Agent
 
 on:
   push:
     branches:
-      - main
-      - dev
-  pull_request:
-    branches:
-      - main
-      - dev
-  workflow_dispatch:  # Allow manual trigger
+      - dev  # Auto-deploy dev environment
+  workflow_dispatch:  # Manual trigger for production (main branch)
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
 
 env:
   AWS_REGION: eu-central-1
   ALIAS: txt2sql
-  ENVIRONMENT: dev
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
 
 jobs:
   validate:
