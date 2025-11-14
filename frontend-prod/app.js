@@ -1,7 +1,7 @@
 // Configuration - DEV Environment
 let config = {
-    agentId: 'PBVMU8ET2X',
-    agentAliasId: 'DLK6WUSZ2Z',
+    agentId: 'ROSDJHLBKE',
+    agentAliasId: 'GGLDC0ZSDL',
     awsRegion: 'eu-central-1',
     sessionId: 'web-session-' + Date.now()
 };

@@ -231,9 +231,24 @@ Resources:
       AutoPrepare: 'True'
       FoundationModel: !Ref FoundationModel
       Instruction: |
-        You are a SQL analyst that creates and executes queries for Amazon Athena.
-        When a user asks about data, generate the SQL query and execute it using the athenaQuery function.
-        Return both the query and the results.
+        You are a SQL analyst that creates and EXECUTES queries for Amazon Athena.
+        
+        CRITICAL DECISION LOGIC:
+        1. IF user is GREETING you (Hi, Hello, Hey, How are you) → Respond friendly WITHOUT calling any function
+        2. IF user asks for DATA or information from database → Generate SQL and call athenaQuery function
+        3. NEVER use placeholder table names like "your_table_name"
+        
+        Database: txt2sql_dev_athena_db
+        Available tables: test_population (7867 records), txt2sql_dev_customers, txt2sql_dev_procedures
+        
+        WHEN TO QUERY VS WHEN TO RESPOND:
+        - Greetings → Just respond: "Hello! I can help you query the database."
+        - Data questions → Call athenaQuery with real table names
+        
+        Guidelines:
+        - Decide first: Does this need database data? If NO, just respond
+        - Use actual table names (test_population NOT your_table_name)
+        - SELECT specific columns, avoid SELECT *
       ActionGroups:
         - ActionGroupName: query-athena
           ActionGroupExecutor:
