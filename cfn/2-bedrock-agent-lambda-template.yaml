@@ -230,7 +230,7 @@ Outputs:
     Value: !Ref BedrockAgent
   AgentAliasId:
     Description: 'ID of the Bedrock Agent Alias'
-    Value: !Ref BedrockAgentAlias
+    Value: !Select [1, !Split ["|", !Ref BedrockAgentAlias]]
   AthenaQueryLambdaArn:
     Description: 'ARN of the Athena Query Lambda function'
     Value: !GetAtt AthenaQueryLambda.Arn
