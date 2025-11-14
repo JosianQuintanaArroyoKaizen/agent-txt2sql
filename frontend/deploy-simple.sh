@@ -140,10 +140,33 @@ if aws lambda get-function --function-name $FUNCTION_NAME --region $REGION >/dev
         --zip-file fileb://lambda-proxy.zip \
         --region $REGION >/dev/null
     
-    aws lambda update-function-configuration \
+    aws lambda wait function-updated \
         --function-name $FUNCTION_NAME \
-        --environment Variables="{AGENT_ID=$AGENT_ID,AGENT_ALIAS_ID=$AGENT_ALIAS_ID,BEDROCK_REGION=$REGION}" \
         --region $REGION >/dev/null
+
+    MAX_RETRIES=10
+    RETRY_DELAY=6
+    ATTEMPT=1
+    while true; do
+        UPDATE_OUTPUT=$(aws lambda update-function-configuration \
+            --function-name $FUNCTION_NAME \
+            --environment Variables="{AGENT_ID=$AGENT_ID,AGENT_ALIAS_ID=$AGENT_ALIAS_ID,BEDROCK_REGION=$REGION}" \
+            --region $REGION 2>&1)
+
+        if [ $? -eq 0 ]; then
+            break
+        fi
+
+        if echo "$UPDATE_OUTPUT" | grep -q "ResourceConflictException" && [ $ATTEMPT -lt $MAX_RETRIES ]; then
+            echo -e "${YELLOW}Lambda update in progress (attempt $ATTEMPT/$MAX_RETRIES). Retrying in ${RETRY_DELAY}s...${NC}"
+            sleep $RETRY_DELAY
+            ATTEMPT=$((ATTEMPT+1))
+        else
+            echo -e "${RED}Failed to update Lambda configuration:${NC}"
+            echo "$UPDATE_OUTPUT"
+            exit 1
+        fi
+    done
     
     echo -e "${GREEN}✅ Lambda updated${NC}"
 else
