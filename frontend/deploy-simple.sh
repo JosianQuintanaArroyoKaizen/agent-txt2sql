@@ -15,8 +15,8 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 REGION="${AWS_REGION:-eu-central-1}"
-AGENT_ID="${AGENT_ID:-G1RWZFEZ4O}"
-AGENT_ALIAS_ID="${AGENT_ALIAS_ID:-TSTALIASID}"
+AGENT_ID="${AGENT_ID}"
+AGENT_ALIAS_ID="${AGENT_ALIAS_ID}"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
 echo -e "${BLUE}========================================${NC}"

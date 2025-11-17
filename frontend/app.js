@@ -1,7 +1,7 @@
 // Configuration - Can be overridden by config.js or localStorage
 let config = {
-    agentId: window.AGENT_CONFIG?.agentId || 'PBVMU8ET2X',
-    agentAliasId: window.AGENT_CONFIG?.agentAliasId || 'DLK6WUSZ2Z',
+    agentId: window.AGENT_CONFIG?.agentId || '',
+    agentAliasId: window.AGENT_CONFIG?.agentAliasId || '',
     awsRegion: window.AGENT_CONFIG?.awsRegion || 'eu-central-1',
     sessionId: 'web-session-' + Date.now()
 };
