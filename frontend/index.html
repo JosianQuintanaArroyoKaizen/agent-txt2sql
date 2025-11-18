@@ -207,18 +207,11 @@
         <h1>🤖 Text2SQL Agent <span style="color: #4CAF50; font-size: 0.6em;">[DEV]</span></h1>
         
         <div class="config-section">
-            <label>Agent ID:</label>
-            <input type="text" id="agentId" placeholder="Enter Bedrock Agent ID" value="PBVMU8ET2X">
-            
-            <label>Agent Alias ID:</label>
-            <input type="text" id="agentAliasId" placeholder="Enter Agent Alias ID" value="DLK6WUSZ2Z">
-            
-            <label>AWS Region:</label>
-            <input type="text" id="awsRegion" placeholder="Enter AWS Region" value="eu-central-1">
-            
-            <button onclick="saveConfig()">Save Configuration</button>
-            <button onclick="setApiEndpoint()" style="background: #FF9800; margin-left: 10px;">Set API Endpoint</button>
+            <button onclick="setApiEndpoint()" style="background: #FF9800;">Set API Endpoint</button>
             <button class="clear-btn" onclick="clearHistory()">Clear Conversation</button>
+            <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                Agent configuration is managed automatically by the backend.
+            </p>
         </div>
         
         <div id="status"></div>
@@ -242,6 +235,9 @@
         </div>
     </div>
 
+    <!-- Load API configuration first (auto-generated during deployment) -->
+    <script src="api-config.js"></script>
+    <!-- Main application -->
     <script src="app.js"></script>
 </body>
 </html>

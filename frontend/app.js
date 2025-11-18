@@ -1,37 +1,7 @@
-// Configuration - DEV Environment
+// Simple configuration - only session ID needed
 let config = {
-    agentId: 'PBVMU8ET2X',
-    agentAliasId: 'DLK6WUSZ2Z',
-    awsRegion: 'eu-central-1',
     sessionId: 'web-session-' + Date.now()
 };
-
-// Load config from localStorage
-function loadConfig() {
-    const saved = localStorage.getItem('agentConfig');
-    if (saved) {
-        config = { ...config, ...JSON.parse(saved) };
-    }
-    
-    document.getElementById('agentId').value = config.agentId;
-    document.getElementById('agentAliasId').value = config.agentAliasId;
-    document.getElementById('awsRegion').value = config.awsRegion;
-}
-
-// Save config to localStorage
-function saveConfig() {
-    config.agentId = document.getElementById('agentId').value.trim();
-    config.agentAliasId = document.getElementById('agentAliasId').value.trim();
-    config.awsRegion = document.getElementById('awsRegion').value.trim();
-    
-    localStorage.setItem('agentConfig', JSON.stringify({
-        agentId: config.agentId,
-        agentAliasId: config.agentAliasId,
-        awsRegion: config.awsRegion
-    }));
-    
-    showStatus('Configuration saved!', 'success');
-}
 
 // Load conversation history
 function loadHistory() {
@@ -101,8 +71,11 @@ function handleKeyPress(event) {
     }
 }
 
-// API endpoint - Update this with your Lambda/API Gateway URL after deployment
-let API_ENDPOINT = localStorage.getItem('apiEndpoint') || 'https://f7tvfb3c2c.execute-api.eu-central-1.amazonaws.com/prod/chat';
+// API endpoint - Updated automatically during deployment via api-config.js
+// Falls back to localStorage for manual override, then to a sensible default
+let API_ENDPOINT = window.API_CONFIG?.endpoint || 
+                   localStorage.getItem('apiEndpoint') || 
+                   'https://api.example.com/chat';
 
 // Set API endpoint
 function setApiEndpoint() {
@@ -124,14 +97,13 @@ async function sendQuestion() {
         return;
     }
     
-    // Ensure API endpoint is set (use hardcoded default if not)
-    if (!API_ENDPOINT) {
-        API_ENDPOINT = 'https://f7tvfb3c2c.execute-api.eu-central-1.amazonaws.com/prod/chat';
-    }
-    
-    // Validate config (optional, can use Lambda defaults)
-    if (!config.agentId || !config.agentAliasId) {
-        showStatus('Using default Agent ID and Alias ID from Lambda configuration', 'success');
+    // Ensure API endpoint is set
+    if (!API_ENDPOINT || API_ENDPOINT === 'https://api.example.com/chat') {
+        showStatus('API endpoint not configured. Please use "Set API Endpoint" button.', 'error');
+        input.disabled = false;
+        sendButton.disabled = false;
+        sendButton.textContent = 'Send';
+        return;
     }
     
     // Disable input
@@ -145,14 +117,13 @@ async function sendQuestion() {
     
     try {
         // Call Lambda proxy via API Gateway
+        // Lambda will use its environment variables for agent configuration
         const response = await fetch(API_ENDPOINT, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                agentId: config.agentId,
-                agentAliasId: config.agentAliasId,
                 sessionId: config.sessionId,
                 question: question
             })
@@ -197,13 +168,17 @@ async function sendQuestion() {
 
 // Initialize on page load
 window.addEventListener('DOMContentLoaded', () => {
-    loadConfig();
     loadHistory();
     
-    // Load API endpoint (fallback to hardcoded)
-    API_ENDPOINT = localStorage.getItem('apiEndpoint') || 'https://f7tvfb3c2c.execute-api.eu-central-1.amazonaws.com/prod/chat';
-    if (API_ENDPOINT) {
+    // Load API endpoint from api-config.js (auto-generated during deployment)
+    API_ENDPOINT = window.API_CONFIG?.endpoint || 
+                   localStorage.getItem('apiEndpoint') || 
+                   'https://api.example.com/chat';
+    
+    if (API_ENDPOINT && API_ENDPOINT !== 'https://api.example.com/chat') {
         showStatus('Ready to chat! Ask about your data.', 'success');
+    } else {
+        showStatus('⚠️ API not configured. Please set the endpoint.', 'error');
     }
 });
 
