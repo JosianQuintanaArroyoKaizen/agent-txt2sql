@@ -44,7 +44,6 @@ jobs:
           echo "Validating CloudFormation templates..."
           aws cloudformation validate-template --template-body file://cfn/1-athena-glue-s3-template.yaml
           aws cloudformation validate-template --template-body file://cfn/2-bedrock-agent-lambda-template.yaml
-          aws cloudformation validate-template --template-body file://cfn/3-ec2-streamlit-template.yaml
           echo "✓ All templates are valid"
 
   deploy-dev:
@@ -226,33 +225,9 @@ jobs:
           export AGENT_ID="${{ steps.agent.outputs.agent_id }}"
           export AGENT_ALIAS_ID="${{ steps.agent.outputs.agent_alias_id }}"
           export AWS_REGION="${{ env.AWS_REGION }}"
+          export ENVIRONMENT="dev"
           ./deploy-simple.sh
           echo "✅ Frontend deployed"
-
-      # Streamlit deployment is optional - uncomment if needed
-      # - name: Deploy Stack 3 - EC2 Streamlit
-      #   run: |
-      #     STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
-      #     case "${{ env.AWS_REGION }}" in
-      #       us-west-2) SSH_CIDR="18.237.140.160/29" ;;
-      #       us-east-1) SSH_CIDR="18.206.107.24/29" ;;
-      #       eu-central-1) SSH_CIDR="3.120.181.40/29" ;;
-      #       eu-west-1) SSH_CIDR="18.202.216.48/29" ;;
-      #       eu-west-2) SSH_CIDR="3.8.37.24/29" ;;
-      #       ap-southeast-1) SSH_CIDR="3.0.5.32/29" ;;
-      #       ap-northeast-1) SSH_CIDR="3.112.23.0/29" ;;
-      #       *) SSH_CIDR="18.237.140.160/29" ;;
-      #     esac
-      #     aws cloudformation deploy \
-      #       --template-file cfn/3-ec2-streamlit-template.yaml \
-      #       --stack-name "${STACK_SUFFIX}-ec2-streamlit-stack" \
-      #       --parameter-overrides \
-      #         InstanceType="t3.small" \
-      #         SSHRegionIPsAllowed="${SSH_CIDR}" \
-      #         MapPublicIpOnLaunch="true" \
-      #       --capabilities CAPABILITY_IAM \
-      #       --region ${{ env.AWS_REGION }} \
-      #       --no-fail-on-empty-changeset
 
       - name: Get Deployment Summary
         id: summary
@@ -287,8 +262,8 @@ jobs:
   deploy-prod:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: deploy-dev
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod'
     environment: production
     
     steps:
@@ -302,13 +277,134 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy to Production
+      - name: Get AWS Account ID
+        id: account
         run: |
-          echo "Deploying to production..."
-          # Add production deployment steps here
-          # Similar to dev deployment but with -prod suffix
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+
+      - name: Deploy Stack 1 - Athena, Glue, S3 (Production)
+        run: |
+          STACK_SUFFIX="prod-${{ env.AWS_REGION }}"
+          ALIAS_FULL="${{ env.ALIAS }}-prod"
+          ALIAS_DB=$(echo "${ALIAS_FULL}" | tr '-' '_')
+          aws cloudformation deploy \
+            --template-file cfn/1-athena-glue-s3-template.yaml \
+            --stack-name "${STACK_SUFFIX}-athena-glue-s3-stack" \
+            --parameter-overrides \
+              Alias="${{ env.ALIAS }}-prod" \
+              AliasDb="${ALIAS_DB}" \
+              AthenaDatabaseName="athena_db" \
+            --capabilities CAPABILITY_IAM \
+            --region ${{ env.AWS_REGION }} \
+            --no-fail-on-empty-changeset
+
+      - name: Wait for Stack 1 (Production)
+        run: |
+          STACK_SUFFIX="prod-${{ env.AWS_REGION }}"
+          aws cloudformation wait stack-create-complete \
+            --stack-name "${STACK_SUFFIX}-athena-glue-s3-stack" \
+            --region ${{ env.AWS_REGION }} || \
+          aws cloudformation wait stack-update-complete \
+            --stack-name "${STACK_SUFFIX}-athena-glue-s3-stack" \
+            --region ${{ env.AWS_REGION }} || true
+
+      - name: Deploy Stack 2 - Bedrock Agent and Lambda (Production)
+        run: |
+          STACK_SUFFIX="prod-${{ env.AWS_REGION }}"
+          ALIAS_FULL="${{ env.ALIAS }}-prod"
+          ALIAS_DB=$(echo "${ALIAS_FULL}" | tr '-' '_')
+          aws cloudformation deploy \
+            --template-file cfn/2-bedrock-agent-lambda-template.yaml \
+            --stack-name "${STACK_SUFFIX}-bedrock-agent-lambda-stack" \
+            --parameter-overrides \
+              Alias="${{ env.ALIAS }}-prod" \
+              FoundationModel="anthropic.claude-3-5-sonnet-20240620-v1:0" \
+              AliasDb="${ALIAS_DB}" \
+              AthenaDatabaseName="athena_db" \
+            --capabilities CAPABILITY_IAM \
+            --region ${{ env.AWS_REGION }} \
+            --no-fail-on-empty-changeset
+
+      - name: Wait for Stack 2 (Production)
+        run: |
+          STACK_SUFFIX="prod-${{ env.AWS_REGION }}"
+          aws cloudformation wait stack-create-complete \
+            --stack-name "${STACK_SUFFIX}-bedrock-agent-lambda-stack" \
+            --region ${{ env.AWS_REGION }} || \
+          aws cloudformation wait stack-update-complete \
+            --stack-name "${STACK_SUFFIX}-bedrock-agent-lambda-stack" \
+            --region ${{ env.AWS_REGION }} || true
+
+      - name: Get Agent IDs (Production)
+        id: agent
+        run: |
+          STACK_SUFFIX="prod-${{ env.AWS_REGION }}"
+          AGENT_ID=$(aws cloudformation describe-stacks \
+            --stack-name "${STACK_SUFFIX}-bedrock-agent-lambda-stack" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`AgentId`].OutputValue' \
+            --output text)
+          
+          AGENT_ALIAS_ID=$(aws cloudformation describe-stacks \
+            --stack-name "${STACK_SUFFIX}-bedrock-agent-lambda-stack" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`AgentAliasId`].OutputValue' \
+            --output text)
+          
+          echo "agent_id=$AGENT_ID" >> $GITHUB_OUTPUT
+          echo "agent_alias_id=$AGENT_ALIAS_ID" >> $GITHUB_OUTPUT
+          echo "Agent ID: $AGENT_ID"
+          echo "Agent Alias ID: $AGENT_ALIAS_ID"
+
+      - name: Prepare Agent (Production)
+        run: |
+          AGENT_ID="${{ steps.agent.outputs.agent_id }}"
+          
+          echo "Preparing production agent..."
+          aws bedrock-agent prepare-agent \
+            --agent-id "$AGENT_ID" \
+            --region ${{ env.AWS_REGION }} \
+            --no-cli-pager
+          
+          echo "Waiting for agent to be prepared (~30 seconds)..."
+          sleep 35
+          
+          AGENT_STATUS=$(aws bedrock-agent get-agent \
+            --agent-id "$AGENT_ID" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'agent.agentStatus' \
+            --output text)
+          
+          echo "✅ Production agent ready. Status: $AGENT_STATUS"
+
+      - name: Deploy Frontend (Production)
+        run: |
+          cd frontend
+          export AGENT_ID="${{ steps.agent.outputs.agent_id }}"
+          export AGENT_ALIAS_ID="${{ steps.agent.outputs.agent_alias_id }}"
+          export AWS_REGION="${{ env.AWS_REGION }}"
+          export ENVIRONMENT="prod"
+          ./deploy-simple.sh
+          echo "✅ Production frontend deployed"
 
       - name: Production Deployment Summary
         run: |
-          echo "### Production Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "✅ All stacks deployed successfully" >> $GITHUB_STEP_SUMMARY
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          FRONTEND_URL="http://txt2sql-frontend-prod-${ACCOUNT_ID}.s3-website.${{ env.AWS_REGION }}.amazonaws.com"
+          API_ID=$(aws apigateway get-rest-apis --region ${{ env.AWS_REGION }} --query "items[?name=='txt2sql-frontend-api'].id" --output text)
+          API_URL="https://${API_ID}.execute-api.${{ env.AWS_REGION }}.amazonaws.com/prod/chat"
+          
+          echo "### Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Production Deployment Successful**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | production |" >> $GITHUB_STEP_SUMMARY
+          echo "| Region | ${{ env.AWS_REGION }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Agent ID | ${{ steps.agent.outputs.agent_id }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Agent Alias ID | ${{ steps.agent.outputs.agent_alias_id }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend URL | ${FRONTEND_URL} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API URL | ${API_URL} |" >> $GITHUB_STEP_SUMMARY
+

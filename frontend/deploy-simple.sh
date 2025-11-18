@@ -15,6 +15,7 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 REGION="${AWS_REGION:-eu-central-1}"
+ENVIRONMENT="${ENVIRONMENT:-dev}"  # Default to dev if not set
 AGENT_ID="${AGENT_ID}"
 AGENT_ALIAS_ID="${AGENT_ALIAS_ID}"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -23,6 +24,7 @@ echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  Simple Frontend Deployment${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
+echo -e "${GREEN}Environment: $ENVIRONMENT${NC}"
 echo -e "${GREEN}Agent ID: $AGENT_ID${NC}"
 echo -e "${GREEN}Agent Alias ID: $AGENT_ALIAS_ID${NC}"
 echo -e "${GREEN}Region: $REGION${NC}"
@@ -309,7 +311,14 @@ echo -e "${GREEN}✅ API config generated${NC}"
 
 # 6. Deploy frontend to S3
 echo -e "${YELLOW}[6/7] Deploying frontend to S3...${NC}"
-BUCKET_NAME="txt2sql-frontend-${ACCOUNT_ID}"
+# Use environment-specific bucket name
+if [ "$ENVIRONMENT" = "prod" ]; then
+    BUCKET_NAME="txt2sql-frontend-prod-${ACCOUNT_ID}"
+else
+    BUCKET_NAME="txt2sql-frontend-${ACCOUNT_ID}"
+fi
+
+echo -e "${BLUE}Using bucket: $BUCKET_NAME${NC}"
 
 if ! aws s3 ls "s3://$BUCKET_NAME" >/dev/null 2>&1; then
     aws s3 mb s3://$BUCKET_NAME --region $REGION
