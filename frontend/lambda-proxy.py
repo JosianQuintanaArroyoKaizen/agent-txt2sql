@@ -61,7 +61,7 @@ def lambda_handler(event, context):
             body = event.get('body', {})
         
         agent_id = body.get('agentId') or os.environ.get('AGENT_ID')
-        agent_alias = body.get('agentAliasId') or os.environ.get('AGENT_ALIAS_NAME', 'txt2sql-dev-eu-central-1-alias')
+        agent_alias = body.get('agentAliasId') or os.environ.get('AGENT_ALIAS_ID')
         session_id = body.get('sessionId', 'web-session')
         question = body.get('question', '')
         
