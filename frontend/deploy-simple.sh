@@ -295,8 +295,20 @@ echo -e "${GREEN}✅ API Gateway configured${NC}"
 echo -e "${BLUE}API URL: $API_URL${NC}"
 echo ""
 
-# 5. Deploy frontend to S3
-echo -e "${YELLOW}[5/6] Deploying frontend to S3...${NC}"
+# 5. Generate dynamic API config file
+echo -e "${YELLOW}[5/6] Generating API configuration...${NC}"
+cat > api-config.js << EOF
+// Auto-generated API configuration - DO NOT EDIT
+window.API_CONFIG = {
+    endpoint: '${API_URL}',
+    generatedAt: new Date().toISOString()
+};
+console.log('API endpoint configured:', window.API_CONFIG.endpoint);
+EOF
+echo -e "${GREEN}✅ API config generated${NC}"
+
+# 6. Deploy frontend to S3
+echo -e "${YELLOW}[6/7] Deploying frontend to S3...${NC}"
 BUCKET_NAME="txt2sql-frontend-${ACCOUNT_ID}"
 
 if ! aws s3 ls "s3://$BUCKET_NAME" >/dev/null 2>&1; then
@@ -314,11 +326,11 @@ fi
 
 aws s3 cp index.html s3://$BUCKET_NAME/ --region $REGION
 aws s3 cp app.js s3://$BUCKET_NAME/ --region $REGION
-# Upload config.js if it exists
-if [ -f "config.js" ]; then
-    aws s3 cp config.js s3://$BUCKET_NAME/ --region $REGION
-    echo -e "${GREEN}✅ Dynamic config uploaded${NC}"
-fi
+aws s3 cp api-config.js s3://$BUCKET_NAME/ --region $REGION
+echo -e "${GREEN}✅ API config uploaded to S3${NC}"
+
+# Clean up local config file
+rm -f api-config.js
 
 aws s3 website s3://$BUCKET_NAME \
     --index-document index.html \

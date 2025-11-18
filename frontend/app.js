@@ -71,8 +71,11 @@ function handleKeyPress(event) {
     }
 }
 
-// API endpoint - Update this with your Lambda/API Gateway URL after deployment
-let API_ENDPOINT = localStorage.getItem('apiEndpoint') || 'https://f7tvfb3c2c.execute-api.eu-central-1.amazonaws.com/prod/chat';
+// API endpoint - Updated automatically during deployment via api-config.js
+// Falls back to localStorage for manual override, then to a sensible default
+let API_ENDPOINT = window.API_CONFIG?.endpoint || 
+                   localStorage.getItem('apiEndpoint') || 
+                   'https://api.example.com/chat';
 
 // Set API endpoint
 function setApiEndpoint() {
@@ -94,9 +97,13 @@ async function sendQuestion() {
         return;
     }
     
-    // Ensure API endpoint is set (use hardcoded default if not)
-    if (!API_ENDPOINT) {
-        API_ENDPOINT = 'https://f7tvfb3c2c.execute-api.eu-central-1.amazonaws.com/prod/chat';
+    // Ensure API endpoint is set
+    if (!API_ENDPOINT || API_ENDPOINT === 'https://api.example.com/chat') {
+        showStatus('API endpoint not configured. Please use "Set API Endpoint" button.', 'error');
+        input.disabled = false;
+        sendButton.disabled = false;
+        sendButton.textContent = 'Send';
+        return;
     }
     
     // Disable input
@@ -163,8 +170,15 @@ async function sendQuestion() {
 window.addEventListener('DOMContentLoaded', () => {
     loadHistory();
     
-    // Load API endpoint (fallback to hardcoded)
-    API_ENDPOINT = localStorage.getItem('apiEndpoint') || 'https://f7tvfb3c2c.execute-api.eu-central-1.amazonaws.com/prod/chat';
-    showStatus('Ready to chat! Ask about your data.', 'success');
+    // Load API endpoint from api-config.js (auto-generated during deployment)
+    API_ENDPOINT = window.API_CONFIG?.endpoint || 
+                   localStorage.getItem('apiEndpoint') || 
+                   'https://api.example.com/chat';
+    
+    if (API_ENDPOINT && API_ENDPOINT !== 'https://api.example.com/chat') {
+        showStatus('Ready to chat! Ask about your data.', 'success');
+    } else {
+        showStatus('⚠️ API not configured. Please set the endpoint.', 'error');
+    }
 });
 
