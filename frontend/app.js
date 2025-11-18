@@ -1,37 +1,7 @@
-// Configuration - Can be overridden by config.js or localStorage
+// Simple configuration - only session ID needed
 let config = {
-    agentId: window.AGENT_CONFIG?.agentId || '',
-    agentAliasId: window.AGENT_CONFIG?.agentAliasId || '',
-    awsRegion: window.AGENT_CONFIG?.awsRegion || 'eu-central-1',
     sessionId: 'web-session-' + Date.now()
 };
-
-// Load config from localStorage
-function loadConfig() {
-    const saved = localStorage.getItem('agentConfig');
-    if (saved) {
-        config = { ...config, ...JSON.parse(saved) };
-    }
-    
-    document.getElementById('agentId').value = config.agentId;
-    document.getElementById('agentAliasId').value = config.agentAliasId;
-    document.getElementById('awsRegion').value = config.awsRegion;
-}
-
-// Save config to localStorage
-function saveConfig() {
-    config.agentId = document.getElementById('agentId').value.trim();
-    config.agentAliasId = document.getElementById('agentAliasId').value.trim();
-    config.awsRegion = document.getElementById('awsRegion').value.trim();
-    
-    localStorage.setItem('agentConfig', JSON.stringify({
-        agentId: config.agentId,
-        agentAliasId: config.agentAliasId,
-        awsRegion: config.awsRegion
-    }));
-    
-    showStatus('Configuration saved!', 'success');
-}
 
 // Load conversation history
 function loadHistory() {
@@ -129,11 +99,6 @@ async function sendQuestion() {
         API_ENDPOINT = 'https://f7tvfb3c2c.execute-api.eu-central-1.amazonaws.com/prod/chat';
     }
     
-    // Validate config (optional, can use Lambda defaults)
-    if (!config.agentId || !config.agentAliasId) {
-        showStatus('Using default Agent ID and Alias ID from Lambda configuration', 'success');
-    }
-    
     // Disable input
     input.disabled = true;
     sendButton.disabled = true;
@@ -145,14 +110,13 @@ async function sendQuestion() {
     
     try {
         // Call Lambda proxy via API Gateway
+        // Lambda will use its environment variables for agent configuration
         const response = await fetch(API_ENDPOINT, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                agentId: config.agentId,
-                agentAliasId: config.agentAliasId,
                 sessionId: config.sessionId,
                 question: question
             })
@@ -197,13 +161,10 @@ async function sendQuestion() {
 
 // Initialize on page load
 window.addEventListener('DOMContentLoaded', () => {
-    loadConfig();
     loadHistory();
     
     // Load API endpoint (fallback to hardcoded)
     API_ENDPOINT = localStorage.getItem('apiEndpoint') || 'https://f7tvfb3c2c.execute-api.eu-central-1.amazonaws.com/prod/chat';
-    if (API_ENDPOINT) {
-        showStatus('Ready to chat! Ask about your data.', 'success');
-    }
+    showStatus('Ready to chat! Ask about your data.', 'success');
 });
 

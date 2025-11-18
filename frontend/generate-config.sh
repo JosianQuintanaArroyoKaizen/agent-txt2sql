@@ -33,17 +33,12 @@ cat > config.js << EOF
 // Generated on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 // DO NOT EDIT MANUALLY - Run generate-config.sh to update
 
-const AGENT_CONFIG = {
+window.AGENT_CONFIG = {
     environment: '${ENVIRONMENT}',
     agentId: '${AGENT_ID}',
     agentAliasId: '${AGENT_ALIAS_ID}',
     awsRegion: '${REGION}'
 };
-
-// Export for use in app.js
-if (typeof window !== 'undefined') {
-    window.AGENT_CONFIG = AGENT_CONFIG;
-}
 EOF
 
 echo "✓ Configuration generated successfully!"
