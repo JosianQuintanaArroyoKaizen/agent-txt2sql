@@ -1,5 +1,5 @@
 
-# Guidance: Setup Amazon Bedrock Agent for Text-to-SQL Using Amazon Athena with Streamlit
+# Guidance: Setup Amazon Bedrock Agent for Text-to-SQL Using Amazon Athena
 
 ### Table of Contents
 1. [Overview](#overview)
@@ -16,7 +16,7 @@
    - [Step 4: Setup Bedrock Agent and Action Group](#step-4-setup-bedrock-agent-and-action-group)
    - [Step 5: Create an Alias](#step-5-create-an-alias)
 9. [Step 6: Testing the Bedrock Agent](#testing-the-bedrock-agent)
-10. [Step 7: Setup and Run Streamlit App on EC2 (Optional)](#step-7-setup-and-run-streamlit-app-on-ec2-optional)
+10. [Accessing the Frontend](#accessing-the-frontend)
 11. [Cleanup](#cleanup)
 12. [Security](#security)
 13. [License](#license)
@@ -98,10 +98,8 @@ Click here to download template 1 🚀 - [1 - Athena-Glue-S3 Stack](https://gith
 - This template will create Amazon Athena, AWS Glue, and an Amazon S3 bucket. Then, it uploads customer and procedure .csv files to the S3 bucket. 
 
 Click here to download template 2 🚀 - [2 - Agent-Lambda Stack](https://github.com/build-on-aws/bedrock-agent-txt2sql/blob/main/cfn/2-bedrock-agent-lambda-template.yaml) 
-- This next template will create an Amazon bedrock agent, action group, with an associated Lambda function.
-
-Click here to download template 3 🚀 - [3 - EC2 UI Stack](https://github.com/build-on-aws/bedrock-agent-txt2sql/blob/main/cfn/3-ec2-streamlit-template.yaml)
-- This template will be used to deploy an EC2 instance that will run the code for the Streamlit UI.
+- This template will create an Amazon Bedrock agent, action group, Lambda function, and the API Gateway for frontend access.
+- The frontend is automatically deployed to S3 with a permanent URL that works immediately after deployment.
 
 ***Step 2***
 
@@ -162,14 +160,18 @@ Click here to download template 3 🚀 - [3 - EC2 UI Stack](https://github.com/b
     4. Get me data of all procedures that were not insured, with customer names.
 
 
-- If you would like to launch the Streamlit app user interface, refer to **Step 7** below to configure the EC2 instance.
+## Accessing the Frontend
 
+Your frontend is automatically deployed to a permanent URL that you can bookmark:
+- **HTTP URL**: `http://txt2sql-frontend-{ACCOUNT_ID}.s3-website.{REGION}.amazonaws.com`
+- **HTTPS URL (Recommended)**: Check your CloudFormation outputs for the CloudFront distribution URL
 
+The frontend automatically discovers the API endpoint during deployment - no configuration needed!
 
 ## Step-by-step Configuration and Setup
 
 ### Step 1: Creating S3 Buckets
-- Make sure that you are in the **us-west-2** region. If another region is required, you will need to update the region in the `invoke_agent.py` file on line 24 of the code. 
+- Make sure that you are in the **eu-central-1** region (or your preferred region). If another region is required, you will need to update the region in the deployment scripts and CloudFormation templates. 
 - **Domain Data Bucket**: Create an S3 bucket to store the domain data. For example, call the S3 bucket `athena-datasource-{alias}`. We will use the default settings. 
 (Make sure to update **{alias}** with the appropriate value throughout the README instructions.)
 
@@ -657,48 +659,8 @@ Here are examples of Amazon Athena queries <athena_examples>.
 1. **Obtain CF template to launch the streamlit app**: Download the Cloudformation template from [here](https://github.com/build-on-aws/bedrock-agent-txt2sql/blob/main/cfn/3-ec2-streamlit-template.yaml). This template will be used to deploy an EC2 instance that has the Streamlit code to run the UI.
 
 
-2. **Edit the app to update agent IDs**:
-   - Navigate to the EC2 instance management console. Under instances, you should see `EC2-Streamlit-App`. Select the checkbox next to it, then connect to it via `EC2 Instance Connect`.
-
-   ![ec2 connect clip](images/ec2_connect.gif)
-
-  - If you see a message that says **EC2 Instance Connect service IP addresses are not authorized**, then you will need to re-deploy the template and select the correct CIDR range for the EC2 based on the region you are in. This will allow you to cannect to the EC2 instance via SSH. By default, it is the allowed CIDR range for **us-west-2** region. However, if you are in the **us-east-1** region for example, the CIDR range will need to be **18.206.107.24/29** when deploying the AWS Cloudformation template. Additional CIDR ranges for each region can be found [here](https://raw.githubusercontent.com/joetek/aws-ip-ranges-json/refs/heads/master/ip-ranges-ec2-instance-connect.json).  
-
-  ![ec2 ssh error](images/ec2_ssh_error.gif)
-
-   - Next, use the following command  to edit the invoke_agent.py file:
-     ```bash
-     sudo vi app/streamlit_app/invoke_agent.py
-     ```
-
-   - Press ***i*** to go into edit mode. Then, update the ***AGENT ID*** and ***Agent ALIAS ID*** values. 
-   
-   ![file_edit](images/file_edit.png)
-   
-   - After, hit `Esc`, then save the file changes with the following command:
-     ```bash
-     :wq!
-     ```   
-
-   - Now, start the streamlit app by running the following command:
-     ```bash
-     streamlit run app/streamlit_app/app.py
-  
-   - You should see an external URL. Copy & paste the URL into a web browser to start the streamlit application.
-
-![External IP](images/external_ip.png)
-
-
-   - Once the app is running, please test some of the sample prompts provided. (On 1st try, if you receive an error, try again.)
-
-![Running App ](images/running_app.png)
-
-Optionally, you can review the trace events in the left toggle of the screen. This data will include the rational tracing, invocation input tracing, and observation tracing.
-
-![Trace events ](images/trace_events.png)
-
-
 ## Cleanup
+
 
 After completing the setup and testing of the Bedrock Agent and Streamlit app, follow these steps to clean up your AWS environment and avoid unnecessary charges:
 1. Delete S3 Buckets:

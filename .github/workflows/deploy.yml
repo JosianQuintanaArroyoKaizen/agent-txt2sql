@@ -44,7 +44,6 @@ jobs:
           echo "Validating CloudFormation templates..."
           aws cloudformation validate-template --template-body file://cfn/1-athena-glue-s3-template.yaml
           aws cloudformation validate-template --template-body file://cfn/2-bedrock-agent-lambda-template.yaml
-          aws cloudformation validate-template --template-body file://cfn/3-ec2-streamlit-template.yaml
           echo "✓ All templates are valid"
 
   deploy-dev:
@@ -226,33 +225,7 @@ jobs:
           export AGENT_ID="${{ steps.agent.outputs.agent_id }}"
           export AGENT_ALIAS_ID="${{ steps.agent.outputs.agent_alias_id }}"
           export AWS_REGION="${{ env.AWS_REGION }}"
-          ./deploy-simple.sh
           echo "✅ Frontend deployed"
-
-      # Streamlit deployment is optional - uncomment if needed
-      # - name: Deploy Stack 3 - EC2 Streamlit
-      #   run: |
-      #     STACK_SUFFIX="${{ env.ENVIRONMENT }}-${{ env.AWS_REGION }}"
-      #     case "${{ env.AWS_REGION }}" in
-      #       us-west-2) SSH_CIDR="18.237.140.160/29" ;;
-      #       us-east-1) SSH_CIDR="18.206.107.24/29" ;;
-      #       eu-central-1) SSH_CIDR="3.120.181.40/29" ;;
-      #       eu-west-1) SSH_CIDR="18.202.216.48/29" ;;
-      #       eu-west-2) SSH_CIDR="3.8.37.24/29" ;;
-      #       ap-southeast-1) SSH_CIDR="3.0.5.32/29" ;;
-      #       ap-northeast-1) SSH_CIDR="3.112.23.0/29" ;;
-      #       *) SSH_CIDR="18.237.140.160/29" ;;
-      #     esac
-      #     aws cloudformation deploy \
-      #       --template-file cfn/3-ec2-streamlit-template.yaml \
-      #       --stack-name "${STACK_SUFFIX}-ec2-streamlit-stack" \
-      #       --parameter-overrides \
-      #         InstanceType="t3.small" \
-      #         SSHRegionIPsAllowed="${SSH_CIDR}" \
-      #         MapPublicIpOnLaunch="true" \
-      #       --capabilities CAPABILITY_IAM \
-      #       --region ${{ env.AWS_REGION }} \
-      #       --no-fail-on-empty-changeset
 
       - name: Get Deployment Summary
         id: summary
