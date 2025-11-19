@@ -1,0 +1,55 @@
+### Table: emir_trade_activity
+EMIR (European Market Infrastructure Regulation) Trade Activity Report containing derivatives trade data from EU markets. Contains 100,000+ trade records with 191 fields covering counterparty information, trade details, valuations, contract specifications, and regulatory compliance data. Use for: derivatives analysis, regulatory reporting, trade surveillance, counterparty risk analysis, market activity monitoring.
+
+**KEY COLUMNS (Top 30 most important):**
+- `Message Received Timestamp`: When trade message was received (ISO 8601: YYYY-MM-DDTHH:MM:SSZ)
+- `Reporting timestamp`: **PRIMARY DATE FIELD** - When trade was reported (ISO 8601). Use for date range queries.
+- `Execution timestamp`: **KEY DATE** - When trade was executed/agreed. Use for "when did trades happen" queries.
+- `Effective date`: Contract start date (YYYY-MM-DD)
+- `Expiration date`: Contract maturity date (YYYY-MM-DD)
+- `UTI`: Unique Transaction Identifier (globally unique trade ID)
+- `Asset class`: **MAJOR FILTER** - CURR=Currency, INTR=Interest Rate, EQUI=Equity, COMM=Commodity, CRDT=Credit
+- `Contract type`: SWAP, OPTN=Option, FUTR=Future, FORW=Forward
+- `Counterparty 1 (Reporting counterparty)`: LEI of reporting counterparty
+- `Counterparty 2`: LEI of second counterparty
+- `Country of the counterparty 2`: ISO 2-letter country code (NL, RO, etc.)
+- `Direction`: BYER=Buyer, SLLR=Seller
+- `Cleared`: **IMPORTANT STATUS** - Whether trade cleared through CCP (true/false)
+- `Central counterparty`: CCP identifier (LCH-GB, CME-US, DTCC-TIW-US, ICE-EU)
+- `Valuation amount`: **CRITICAL FINANCIAL** - Mark-to-market value (STRING, CAST to DOUBLE)
+- `Valuation currency`: Currency of valuation (EUR, USD, GBP, etc.)
+- `Notional amount of leg 1`: **KEY FINANCIAL** - Face value leg 1 (STRING, CAST to DOUBLE)
+- `Notional currency 1`: Currency of notional leg 1
+- `Notional amount of leg 2`: Face value leg 2 (STRING, CAST to DOUBLE)
+- `Notional currency 2`: Currency of notional leg 2
+- `Price`: Trade execution price (numeric)
+- `Price currency`: Currency of price
+- `Settlement currency 1`: Settlement currency leg 1
+- `Settlement currency 2`: Settlement currency leg 2
+- `Venue of execution`: MIC code (XAMS=Amsterdam, XFRA=Frankfurt)
+- `Action type`: NEWT=New Trade, MODI=Modification, EROR=Error
+- `Event type`: NOVA=Novation, COMP=Compression, UPDT=Update
+- `ISIN`: ISIN code of instrument
+- `Option type`: CALL, PUTO=Put, OTHR
+- `Strike price`: Option strike/exercise price
+
+**IMPORTANT NOTES:**
+- Table has 191 total columns - **NEVER use SELECT * **
+- All columns are STRING type - use **CAST()** for numeric operations
+- Date fields are ISO format strings
+- For financial calculations: `CAST("Valuation amount" AS DOUBLE)`
+- For date queries: Use `Reporting timestamp` as primary date field
+
+**Common Query Patterns:**
+- Count trades: `SELECT COUNT(*) FROM emir_trade_activity`
+- By asset class: `WHERE "Asset class" = 'CURR'`
+- Date range: `WHERE "Reporting timestamp" >= '2025-09-01'`
+- Cleared vs uncleared: `GROUP BY "Cleared"`
+- Total notional: `SELECT SUM(CAST("Notional amount of leg 1" AS DOUBLE))`
+
+**Use this table for queries about:**
+- "EMIR trades", "derivatives", "trade activity"
+- "cleared trades", "swap transactions"
+- "currency derivatives", "interest rate swaps"
+- "trade valuations", "notional amounts"
+- "counterparty analysis", "execution venues"

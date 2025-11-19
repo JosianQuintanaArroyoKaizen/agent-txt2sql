@@ -82,6 +82,99 @@ Demo customer data (for testing).
 
 ---
 
+### Table: emir_trade_activity (100,000 rows)
+EMIR (European Market Infrastructure Regulation) Trade Activity Report containing derivatives trade data from EU markets. Contains 100,000+ trade records with 191 fields covering counterparty information, trade details, valuations, contract specifications, and regulatory compliance data.
+
+**Use this table for queries about:** "EMIR trades", "derivatives", "trade activity", "cleared trades", "swap transactions", "currency derivatives", "interest rate swaps", "trade valuations", "notional amounts", "counterparty analysis", "execution venues"
+
+**KEY COLUMNS (Top 30 most important):**
+
+**Date/Time Fields:**
+- `Reporting timestamp`: STRING - **PRIMARY DATE FIELD** - When trade was reported (ISO 8601). Use for date range queries.
+- `Execution timestamp`: STRING - **KEY DATE** - When trade was executed/agreed. Use for "when did trades happen" queries.
+- `Effective date`: STRING - Contract start date (YYYY-MM-DD)
+- `Expiration date`: STRING - Contract maturity date (YYYY-MM-DD)
+- `Message Received Timestamp`: STRING - When trade message was received (ISO 8601: YYYY-MM-DDTHH:MM:SSZ)
+
+**Identifiers:**
+- `UTI`: STRING - Unique Transaction Identifier (globally unique trade ID)
+
+**Product Classification:**
+- `Asset class`: STRING - **MAJOR FILTER** - CURR=Currency, INTR=Interest Rate, EQUI=Equity, COMM=Commodity, CRDT=Credit
+- `Contract type`: STRING - SWAP, OPTN=Option, FUTR=Future, FORW=Forward
+- `Option type`: STRING - CALL, PUTO=Put, OTHR
+- `ISIN`: STRING - ISIN code of instrument
+
+**Counterparty Info:**
+- `Counterparty 1 (Reporting counterparty)`: STRING - LEI of reporting counterparty
+- `Counterparty 2`: STRING - LEI of second counterparty
+- `Country of the counterparty 2`: STRING - ISO 2-letter country code (NL, RO, etc.)
+- `Direction`: STRING - BYER=Buyer, SLLR=Seller
+
+**Clearing:**
+- `Cleared`: STRING - **IMPORTANT STATUS** - Whether trade cleared through CCP (true/false)
+- `Central counterparty`: STRING - CCP identifier (LCH-GB, CME-US, DTCC-TIW-US, ICE-EU)
+
+**Financial Data (ALL STORED AS STRING - CAST TO DOUBLE FOR CALCULATIONS):**
+- `Valuation amount`: STRING - **CRITICAL FINANCIAL** - Mark-to-market value
+- `Valuation currency`: STRING - Currency of valuation (EUR, USD, GBP, etc.)
+- `Notional amount of leg 1`: STRING - **KEY FINANCIAL** - Face value leg 1
+- `Notional currency 1`: STRING - Currency of notional leg 1
+- `Notional amount of leg 2`: STRING - Face value leg 2
+- `Notional currency 2`: STRING - Currency of notional leg 2
+- `Price`: STRING - Trade execution price (numeric)
+- `Price currency`: STRING - Currency of price
+- `Strike price`: STRING - Option strike/exercise price
+
+**Settlement:**
+- `Settlement currency 1`: STRING - Settlement currency leg 1
+- `Settlement currency 2`: STRING - Settlement currency leg 2
+
+**Trading Venue:**
+- `Venue of execution`: STRING - MIC code (XAMS=Amsterdam, XFRA=Frankfurt)
+
+**Trade Lifecycle:**
+- `Action type`: STRING - NEWT=New Trade, MODI=Modification, EROR=Error
+- `Event type`: STRING - NOVA=Novation, COMP=Compression, UPDT=Update
+
+**CRITICAL NOTES:**
+- Table has **191 total columns** - **NEVER use SELECT ***
+- **All columns are STRING type** - use **CAST()** for numeric operations
+- Date fields are ISO format strings
+- For financial calculations: `CAST("Valuation amount" AS DOUBLE)`
+- For date queries: Use `Reporting timestamp` as primary date field
+- Column names have spaces - **ALWAYS use backticks or double quotes**
+
+**Common Query Examples:**
+```sql
+-- Count trades
+SELECT COUNT(*) FROM emir_trade_activity;
+
+-- By asset class
+SELECT "Asset class", COUNT(*) as count 
+FROM emir_trade_activity 
+WHERE "Asset class" IS NOT NULL 
+GROUP BY "Asset class";
+
+-- Date range
+SELECT COUNT(*) 
+FROM emir_trade_activity 
+WHERE "Reporting timestamp" >= '2025-09-01';
+
+-- Cleared vs uncleared
+SELECT "Cleared", COUNT(*) 
+FROM emir_trade_activity 
+GROUP BY "Cleared";
+
+-- Total notional (requires CAST)
+SELECT SUM(CAST("Notional amount of leg 1" AS DOUBLE)) as total_notional
+FROM emir_trade_activity
+WHERE "Notional amount of leg 1" IS NOT NULL 
+  AND "Notional amount of leg 1" != '';
+```
+
+---
+
 ### Table: txt2sql_dev_procedures
 Demo procedures data (for testing).
 - `Procedure_ID`: VARCHAR - Procedure identifier

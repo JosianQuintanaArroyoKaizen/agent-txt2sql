@@ -1,0 +1,27 @@
+{
+  "table_description": "Sales transactions for 2024 including product information, customer details, and revenue data",
+  "common_queries": [
+    "sales by region",
+    "revenue trends",
+    "top products",
+    "customer purchases",
+    "monthly sales"
+  ],
+  "columns": {
+    "sale_id": "Unique sale transaction identifier (primary key)",
+    "transaction_date": "Date of the sale (YYYY-MM-DD format)",
+    "customer_id": "Customer identifier (foreign key to customers table)",
+    "customer_name": "Full name of the customer",
+    "product_sku": "Product SKU code",
+    "product_name": "Product name/description",
+    "quantity": "Quantity sold",
+    "unit_price": "Price per unit in USD",
+    "total_amount": "Total sale amount (quantity * unit_price)",
+    "discount": "Discount applied in USD",
+    "tax": "Tax amount in USD",
+    "region": "Sales region (North, South, East, West)",
+    "sales_rep_id": "Sales representative ID",
+    "payment_method": "Payment method (Credit Card, Cash, Wire Transfer)",
+    "status": "Order status (Completed, Pending, Cancelled)"
+  }
+}
